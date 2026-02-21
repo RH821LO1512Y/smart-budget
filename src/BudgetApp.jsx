@@ -32,16 +32,153 @@ const T = {
 const CATEGORY_COLORS = [T.coral, T.teal, T.yellow, T.purple, T.green, T.blue, "#FB923C", "#F472B6", "#34D399", "#FCD34D"];
 
 const DEFAULT_CATEGORIES = [
-  { id: "housing", name: "Housing", color: T.coral, budget: 1500, type: "expense" },
-  { id: "food", name: "Food & Dining", color: T.teal, budget: 600, type: "expense" },
-  { id: "transport", name: "Transport", color: T.yellow, budget: 300, type: "expense" },
-  { id: "entertainment", name: "Entertainment", color: T.purple, budget: 200, type: "expense" },
-  { id: "utilities", name: "Utilities", color: T.blue, budget: 250, type: "expense" },
-  { id: "healthcare", name: "Healthcare", color: T.green, budget: 150, type: "expense" },
-  { id: "shopping", name: "Shopping", color: "#FB923C", budget: 400, type: "expense" },
-  { id: "income", name: "Income", color: T.green, budget: 0, type: "income" },
-  { id: "savings", name: "Savings", color: "#FCD34D", budget: 500, type: "savings" },
-  { id: "other", name: "Other", color: T.muted, budget: 200, type: "expense" },
+  // ── Income & Savings ──
+  { id: "income",        name: "Income",           color: T.green,   budget: 0,    type: "income"   },
+  { id: "savings",       name: "Savings",           color: "#FCD34D", budget: 500,  type: "savings"  },
+  { id: "marcus",        name: "Marcus",            color: "#FCD34D", budget: 0,    type: "savings"  },
+  // ── Housing ──
+  { id: "housing",       name: "Rent",              color: T.coral,   budget: 1500, type: "expense"  },
+  // ── Food ──
+  { id: "food",          name: "Food & Dining",     color: T.teal,    budget: 600,  type: "expense"  },
+  { id: "grocery",       name: "Grocery",           color: "#34D399", budget: 400,  type: "expense"  },
+  // ── Transport ──
+  { id: "transport",     name: "Transportation",    color: T.yellow,  budget: 200,  type: "expense"  },
+  { id: "gasoline",      name: "Gasoline",          color: "#FB923C", budget: 150,  type: "expense"  },
+  // ── Utilities ──
+  { id: "electricity",   name: "Electricity",       color: "#60A5FA", budget: 150,  type: "expense"  },
+  { id: "wifi",          name: "Wi-Fi",             color: "#818CF8", budget: 80,   type: "expense"  },
+  { id: "phone",         name: "Phone",             color: "#A78BFA", budget: 80,   type: "expense"  },
+  // ── Health ──
+  { id: "health_ins",    name: "Health Insurance",  color: T.green,   budget: 300,  type: "expense"  },
+  { id: "dental",        name: "Dental",            color: "#6EE7B7", budget: 100,  type: "expense"  },
+  { id: "medical",       name: "Medical Bills",     color: "#F87171", budget: 200,  type: "expense"  },
+  // ── Credit Cards / Loans ──
+  { id: "car_payment",   name: "Car Payment",       color: "#FBBF24", budget: 400,  type: "expense"  },
+  { id: "apple_card",    name: "Apple Card",        color: "#E5E7EB", budget: 200,  type: "expense"  },
+  { id: "citi_card",     name: "CITI Card",         color: "#3B82F6", budget: 200,  type: "expense"  },
+  { id: "care_credit",   name: "Care Credit",       color: "#EC4899", budget: 100,  type: "expense"  },
+  { id: "wells_fargo",   name: "Wells Fargo Card",  color: "#EF4444", budget: 200,  type: "expense"  },
+  { id: "amoco_loan",    name: "AMOCO Loan",        color: "#F59E0B", budget: 0,    type: "expense"  },
+  { id: "jgw",           name: "JG Wentworth",      color: "#D97706", budget: 0,    type: "expense"  },
+  // ── Lifestyle ──
+  { id: "fitness",       name: "Fitness",           color: "#4ADE80", budget: 60,   type: "expense"  },
+  { id: "self_care",     name: "Self Care",         color: "#F472B6", budget: 100,  type: "expense"  },
+  { id: "dogs",          name: "Dogs",              color: "#A3E635", budget: 100,  type: "expense"  },
+  { id: "baby",          name: "Baby",              color: "#FDE68A", budget: 150,  type: "expense"  },
+  { id: "contribution",  name: "Contribution",      color: "#C4B5FD", budget: 100,  type: "expense"  },
+  { id: "subscriptions", name: "Subscriptions",     color: T.purple,  budget: 100,  type: "expense"  },
+  { id: "entertainment", name: "Entertainment",     color: "#F472B6", budget: 100,  type: "expense"  },
+  // ── Travel & Misc ──
+  { id: "travel",        name: "Travel",            color: "#67E8F9", budget: 200,  type: "expense"  },
+  { id: "shopping",      name: "Shopping / Misc",   color: "#FB923C", budget: 200,  type: "expense"  },
+  { id: "work",          name: "Work",              color: "#94A3B8", budget: 0,    type: "expense"  },
+  { id: "other",         name: "Other",             color: T.muted,   budget: 100,  type: "expense"  },
+];
+
+// ── Default keyword → category mappings (Rachel's custom list) ────────────────
+const DEFAULT_KEYWORDS = [
+  // Income
+  { id: "kw_payroll",    keyword: "payroll",          categoryId: "income"       },
+  { id: "kw_salary",     keyword: "salary",           categoryId: "income"       },
+  { id: "kw_ddep",       keyword: "direct deposit",   categoryId: "income"       },
+  { id: "kw_zelle",      keyword: "zelle",            categoryId: "income"       },
+  // Savings
+  { id: "kw_acorns",     keyword: "acorns",           categoryId: "savings"      },
+  { id: "kw_marcus1",    keyword: "marcus",           categoryId: "marcus"       },
+  { id: "kw_transfer",   keyword: "transfer",         categoryId: "savings"      },
+  // Rent
+  { id: "kw_rent",       keyword: "apts lewis",       categoryId: "housing"      },
+  { id: "kw_rent2",      keyword: "rent",             categoryId: "housing"      },
+  { id: "kw_mortgage",   keyword: "mortgage",         categoryId: "housing"      },
+  // Food
+  { id: "kw_chickfila",  keyword: "chick-fil-a",      categoryId: "food"         },
+  { id: "kw_dq",         keyword: "dairy queen",      categoryId: "food"         },
+  { id: "kw_doordash",   keyword: "doordash",         categoryId: "food"         },
+  { id: "kw_mcdonalds",  keyword: "mcdonald",         categoryId: "food"         },
+  { id: "kw_shipley",    keyword: "shipley",          categoryId: "food"         },
+  { id: "kw_starbucks",  keyword: "starbucks",        categoryId: "food"         },
+  { id: "kw_wingstop",   keyword: "wingstop",         categoryId: "food"         },
+  { id: "kw_restaurant", keyword: "restaurant",       categoryId: "food"         },
+  { id: "kw_ubereats",   keyword: "uber eats",        categoryId: "food"         },
+  { id: "kw_grubhub",    keyword: "grubhub",          categoryId: "food"         },
+  // Grocery
+  { id: "kw_heb",        keyword: "h-e-b",            categoryId: "grocery"      },
+  { id: "kw_kroger",     keyword: "kroger",           categoryId: "grocery"      },
+  { id: "kw_walmart",    keyword: "wal-mart",         categoryId: "grocery"      },
+  { id: "kw_walmart2",   keyword: "walmart",          categoryId: "grocery"      },
+  { id: "kw_aldi",       keyword: "aldi",             categoryId: "grocery"      },
+  // Gasoline
+  { id: "kw_chevron",    keyword: "chevron",          categoryId: "gasoline"     },
+  { id: "kw_fuel",       keyword: "fuel",             categoryId: "gasoline"     },
+  { id: "kw_shell",      keyword: "shell",            categoryId: "gasoline"     },
+  { id: "kw_exxon",      keyword: "exxon",            categoryId: "gasoline"     },
+  // Gas utility
+  { id: "kw_cpenergy",   keyword: "cpenergy",         categoryId: "electricity"  },
+  { id: "kw_reliant",    keyword: "reliant",          categoryId: "electricity"  },
+  // Wi-Fi
+  { id: "kw_comcast",    keyword: "comcast",          categoryId: "wifi"         },
+  // Phone
+  { id: "kw_mobile",     keyword: "mobile",           categoryId: "phone"        },
+  { id: "kw_tmobile",    keyword: "t-mobile",         categoryId: "phone"        },
+  { id: "kw_att",        keyword: "at&t",             categoryId: "phone"        },
+  // Health Insurance
+  { id: "kw_aetna",      keyword: "aetna",            categoryId: "health_ins"   },
+  { id: "kw_ambetter",   keyword: "ambetter",         categoryId: "health_ins"   },
+  { id: "kw_guardian",   keyword: "guardian",         categoryId: "health_ins"   },
+  // Dental
+  { id: "kw_dental",     keyword: "dental",           categoryId: "dental"       },
+  // Medical
+  { id: "kw_napaa",      keyword: "napaanesth",       categoryId: "medical"      },
+  { id: "kw_peds_uro",   keyword: "pediatric urology",categoryId: "medical"      },
+  { id: "kw_serene",     keyword: "serene",           categoryId: "medical"      },
+  { id: "kw_kelsey",     keyword: "kelsey",           categoryId: "medical"      },
+  { id: "kw_memorial",   keyword: "memorial herma",   categoryId: "medical"      },
+  // Credit Cards / Loans
+  { id: "kw_wf_pay",     keyword: "wf payment",       categoryId: "car_payment"  },
+  { id: "kw_apple",      keyword: "applecard",        categoryId: "apple_card"   },
+  { id: "kw_citi",       keyword: "citi",             categoryId: "citi_card"    },
+  { id: "kw_sync",       keyword: "synchrony bank",   categoryId: "care_credit"  },
+  { id: "kw_wf_cred",    keyword: "wf credit",        categoryId: "wells_fargo"  },
+  { id: "kw_amoco",      keyword: "amoco",            categoryId: "amoco_loan"   },
+  { id: "kw_jgw",        keyword: "jgw",              categoryId: "jgw"          },
+  { id: "kw_goldman",    keyword: "goldman",          categoryId: "marcus"       },
+  // Fitness
+  { id: "kw_fitness",    keyword: "fitness",          categoryId: "fitness"      },
+  // Self Care
+  { id: "kw_sally",      keyword: "sally",            categoryId: "self_care"    },
+  // Dogs
+  { id: "kw_rainwalk",   keyword: "rainwalk",         categoryId: "dogs"         },
+  { id: "kw_petco",      keyword: "petco",            categoryId: "dogs"         },
+  { id: "kw_petsmart",   keyword: "petsmart",         categoryId: "dogs"         },
+  // Baby
+  { id: "kw_carters",    keyword: "carters",          categoryId: "baby"         },
+  // Contribution
+  { id: "kw_tithe",      keyword: "tithe.ly",         categoryId: "contribution" },
+  // Subscriptions
+  { id: "kw_sub",        keyword: "subscription",     categoryId: "subscriptions"},
+  { id: "kw_netflix",    keyword: "netflix",          categoryId: "subscriptions"},
+  { id: "kw_spotify",    keyword: "spotify",          categoryId: "subscriptions"},
+  { id: "kw_hulu",       keyword: "hulu",             categoryId: "subscriptions"},
+  { id: "kw_disney",     keyword: "disney+",          categoryId: "subscriptions"},
+  // Entertainment  
+  { id: "kw_movie",      keyword: "movie",            categoryId: "entertainment"},
+  { id: "kw_cinema",     keyword: "cinema",           categoryId: "entertainment"},
+  // Shopping / Misc
+  { id: "kw_amazon",     keyword: "amazon",           categoryId: "shopping"     },
+  { id: "kw_homedepot",  keyword: "home depot",       categoryId: "shopping"     },
+  { id: "kw_oportun",    keyword: "oportun",          categoryId: "shopping"     },
+  { id: "kw_target",     keyword: "target",           categoryId: "shopping"     },
+  // Transportation
+  { id: "kw_hctra",      keyword: "hctra",            categoryId: "transport"    },
+  { id: "kw_parking",    keyword: "parking",          categoryId: "transport"    },
+  { id: "kw_uber",       keyword: "uber",             categoryId: "transport"    },
+  { id: "kw_lyft",       keyword: "lyft",             categoryId: "transport"    },
+  // Travel
+  { id: "kw_iah",        keyword: "iah",              categoryId: "travel"       },
+  { id: "kw_airport",    keyword: "airport",          categoryId: "travel"       },
+  { id: "kw_hotel",      keyword: "hotel",            categoryId: "travel"       },
+  // Work
+  { id: "kw_mailmeteor", keyword: "mailmeteor",       categoryId: "work"         },
 ];
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -53,24 +190,29 @@ const parseAmount = (v) => {
   const s = String(v).replace(/[$,\s]/g, "");
   return parseFloat(s) || 0;
 };
-const guessCategory = (desc = "", cats) => {
-  const d = desc.toLowerCase();
-  if (/rent|mortgage|hoa/.test(d)) return cats.find(c => c.id === "housing")?.id;
-  if (/grocery|walmart|whole foods|trader joe|kroger|safeway|food|restaurant|cafe|mcdonald|starbucks|pizza|sushi|chipotle/.test(d)) return cats.find(c => c.id === "food")?.id;
-  if (/uber|lyft|gas|fuel|parking|metro|transit|transport|car/.test(d)) return cats.find(c => c.id === "transport")?.id;
-  if (/netflix|spotify|hulu|disney|amazon prime|youtube|entertainment|movie|game/.test(d)) return cats.find(c => c.id === "entertainment")?.id;
-  if (/electric|water|internet|phone|att|verizon|comcast|utility/.test(d)) return cats.find(c => c.id === "utilities")?.id;
-  if (/pharmacy|doctor|medical|health|dental|vision|cvs|walgreen/.test(d)) return cats.find(c => c.id === "healthcare")?.id;
-  if (/amazon|target|costco|shopping|store|mall/.test(d)) return cats.find(c => c.id === "shopping")?.id;
-  if (/payroll|salary|direct deposit|income|deposit/.test(d)) return cats.find(c => c.id === "income")?.id;
-  if (/transfer|savings|save/.test(d)) return cats.find(c => c.id === "savings")?.id;
+// customKeywords: [{id, keyword, categoryId}]
+const guessCategory = (desc = "", cats, customKeywords = []) => {
+  const d = desc.toLowerCase().trim();
+  // 1. Check user-defined keywords FIRST (most specific)
+  for (const kw of customKeywords) {
+    if (kw.keyword && d.includes(kw.keyword.toLowerCase().trim())) {
+      return kw.categoryId;
+    }
+  }
+  // 2. Check built-in DEFAULT_KEYWORDS
+  for (const kw of DEFAULT_KEYWORDS) {
+    if (kw.keyword && d.includes(kw.keyword.toLowerCase().trim())) {
+      return kw.categoryId;
+    }
+  }
+  // 3. Final fallback
   return cats.find(c => c.id === "other")?.id;
 };
 
 // ─── Supabase Config ──────────────────────────────────────────────────────────
 // 👇 Paste your Supabase project URL and anon key here (from supabase.com → Project Settings → API)
-const SUPABASE_URL = "https://YOUR_PROJECT_ID.supabase.co";
-const SUPABASE_ANON_KEY = "YOUR_ANON_KEY_HERE";
+const SUPABASE_URL = "https://mlsnwxuyvfzqqextcems.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_Wof2d5MpMxvckU7gNOyP0g_9YhCvf6T";
 
 // Lightweight Supabase REST helper (no npm package needed)
 const sb = {
@@ -219,6 +361,7 @@ export default function BudgetApp() {
     { id: "s1", date: "2026-02-25", type: "transfer", amount: 500, note: "Transfer to savings", from: "Checking", to: "Savings" },
     { id: "s2", date: "2026-03-01", type: "bill", amount: 1500, note: "Rent due", from: "Checking", to: "Landlord" },
   ]);
+  const [customKeywords, setCustomKeywords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [uploadDrag, setUploadDrag] = useState(false);
@@ -233,16 +376,18 @@ export default function BudgetApp() {
     (async () => {
       if (isSupabaseReady()) {
         try {
-          const [txns, cats, bls, sched] = await Promise.all([
+          const [txns, cats, bls, sched, kwds] = await Promise.all([
             sb.getAll("transactions"),
             sb.getAll("categories"),
             sb.getAll("bills"),
             sb.getAll("schedule"),
+            sb.getAll("custom_keywords"),
           ]);
           if (txns.length) setTransactions(txns);
           if (cats.length) setCategories(cats);
           if (bls.length) setBills(bls);
           if (sched.length) setSchedule(sched);
+          if (kwds.length) setCustomKeywords(kwds);
           setDbStatus("connected");
         } catch (e) {
           console.warn("Supabase load failed, falling back to local", e);
@@ -262,6 +407,7 @@ export default function BudgetApp() {
           if (saved.categories) setCategories(saved.categories);
           if (saved.bills) setBills(saved.bills);
           if (saved.schedule) setSchedule(saved.schedule);
+          if (saved.customKeywords) setCustomKeywords(saved.customKeywords);
         }
         setDbStatus("local");
       }
@@ -278,10 +424,11 @@ export default function BudgetApp() {
       sb.upsertMany("categories", categories).catch(() => {});
       sb.upsertMany("bills", bills).catch(() => {});
       sb.upsertMany("schedule", schedule).catch(() => {});
+      sb.upsertMany("custom_keywords", customKeywords).catch(() => {});
     } else {
-      localSave({ transactions, categories, bills, schedule });
+      localSave({ transactions, categories, bills, schedule, customKeywords });
     }
-  }, [transactions, categories, bills, schedule, loading, dbStatus]);
+  }, [transactions, categories, bills, schedule, customKeywords, loading, dbStatus]);
 
   const notify = (msg, type = "success") => {
     setNotification({ msg, type });
@@ -308,7 +455,7 @@ export default function BudgetApp() {
           const lines = text.split("\n").filter(Boolean);
           const headers = lines[0].split(",").map(h => h.trim().toLowerCase().replace(/"/g, ""));
           const dateCol = headers.findIndex(h => /date/.test(h));
-          const descCol = headers.findIndex(h => /desc|narr|memo|name|detail/.test(h));
+          const descCol = headers.findIndex(h => /desc|narr|memo|payee|merchant|detail|transaction|particulars|reference/.test(h));
           const amtCol = headers.findIndex(h => /amount|debit|credit/.test(h));
           const debitCol = headers.findIndex(h => /debit/.test(h));
           const creditCol = headers.findIndex(h => /credit/.test(h));
@@ -322,7 +469,7 @@ export default function BudgetApp() {
               const c = parseAmount(cols[creditCol]);
               amount = c > 0 ? c : -d;
             }
-            rows.push({ id: `t_${Date.now()}_${i}`, date: cols[dateCol] || new Date().toISOString().split("T")[0], description: desc, amount, categoryId: guessCategory(desc, categories), note: "" });
+            rows.push({ id: `t_${Date.now()}_${i}`, date: cols[dateCol] || new Date().toISOString().split("T")[0], description: desc, amount, categoryId: guessCategory(desc, categories, customKeywords), note: "" });
           });
         } else {
           // Excel via SheetJS
@@ -334,10 +481,10 @@ export default function BudgetApp() {
           json.forEach((row, i) => {
             const keys = Object.keys(row).map(k => k.toLowerCase());
             const dateKey = Object.keys(row).find(k => /date/.test(k.toLowerCase()));
-            const descKey = Object.keys(row).find(k => /desc|narr|memo|name|detail/.test(k.toLowerCase()));
+            const descKey = Object.keys(row).find(k => /desc|narr|memo|payee|merchant|detail|transaction|particulars|reference/.test(k.toLowerCase()));
             const amtKey = Object.keys(row).find(k => /amount|debit|credit/.test(k.toLowerCase()));
             const desc = (descKey && row[descKey]) || `Transaction ${i + 1}`;
-            rows.push({ id: `t_${Date.now()}_${i}`, date: (dateKey && row[dateKey]) || new Date().toISOString().split("T")[0], description: String(desc), amount: parseAmount(amtKey ? row[amtKey] : 0), categoryId: guessCategory(String(desc), categories), note: "" });
+            rows.push({ id: `t_${Date.now()}_${i}`, date: (dateKey && row[dateKey]) || new Date().toISOString().split("T")[0], description: String(desc), amount: parseAmount(amtKey ? row[amtKey] : 0), categoryId: guessCategory(String(desc), categories, customKeywords), note: "" });
           });
         }
         const valid = rows.filter(r => r.description && !isNaN(r.amount));
@@ -682,6 +829,78 @@ export default function BudgetApp() {
                 );
               })}
             </div>
+
+            {/* ── Keyword Manager ── */}
+            <div style={{ marginTop: 32 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+                <div>
+                  <div style={{ fontFamily: "Syne", fontSize: 18, fontWeight: 700 }}>Keyword Rules</div>
+                  <div style={{ fontSize: 13, color: T.muted, marginTop: 2 }}>
+                    When a transaction description contains a keyword, it auto-assigns that category.
+                    Your custom rules are checked <span style={{ color: T.teal }}>first</span>.
+                  </div>
+                </div>
+                <button className="btn btn-primary" onClick={() => setModal({ type: "addKeyword" })}>
+                  <Plus size={15} /> Add Rule
+                </button>
+              </div>
+
+              {/* Custom keywords */}
+              {customKeywords.length > 0 && (
+                <div className="card" style={{ padding: 0, overflow: "hidden", marginBottom: 16 }}>
+                  <div style={{ padding: "12px 16px", borderBottom: `1px solid ${T.border}`, fontSize: 12, fontWeight: 600, color: T.teal, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    Your Custom Rules ({customKeywords.length})
+                  </div>
+                  <div style={{ overflowX: "auto" }}>
+                    <table>
+                      <thead><tr><th>Keyword</th><th>Category</th><th></th></tr></thead>
+                      <tbody>
+                        {customKeywords.map(kw => {
+                          const cat = categories.find(c => c.id === kw.categoryId);
+                          return (
+                            <tr key={kw.id}>
+                              <td><span style={{ fontFamily: "monospace", background: "rgba(255,255,255,0.06)", padding: "2px 8px", borderRadius: 6, fontSize: 13 }}>{kw.keyword}</span></td>
+                              <td><CategoryBadge category={cat} /></td>
+                              <td>
+                                <button className="btn btn-danger" style={{ padding: "4px 8px" }}
+                                  onClick={() => { setCustomKeywords(prev => prev.filter(k => k.id !== kw.id)); if(dbStatus==="connected") sb.remove("custom_keywords", kw.id); }}>
+                                  <Trash2 size={12} />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Built-in default keywords (read-only, collapsible) */}
+              <details>
+                <summary style={{ cursor: "pointer", color: T.muted, fontSize: 13, userSelect: "none", padding: "8px 0" }}>
+                  View {DEFAULT_KEYWORDS.length} built-in keyword rules (read-only)
+                </summary>
+                <div className="card" style={{ padding: 0, overflow: "hidden", marginTop: 10 }}>
+                  <div style={{ overflowX: "auto", maxHeight: 320, overflowY: "auto" }}>
+                    <table>
+                      <thead><tr><th>Keyword</th><th>Category</th></tr></thead>
+                      <tbody>
+                        {DEFAULT_KEYWORDS.map(kw => {
+                          const cat = categories.find(c => c.id === kw.categoryId);
+                          return (
+                            <tr key={kw.id}>
+                              <td><span style={{ fontFamily: "monospace", background: "rgba(255,255,255,0.06)", padding: "2px 8px", borderRadius: 6, fontSize: 12 }}>{kw.keyword}</span></td>
+                              <td><CategoryBadge category={cat} /></td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </details>
+            </div>
           </div>
         )}
 
@@ -770,13 +989,13 @@ export default function BudgetApp() {
       </main>
 
       {/* ─ Modals ─ */}
-      {modal && <Modal modal={modal} setModal={setModal} categories={categories} setCategories={setCategories} bills={bills} setBills={setBills} schedule={schedule} setSchedule={setSchedule} transactions={transactions} setTransactions={setTransactions} notify={notify} />}
+      {modal && <Modal modal={modal} setModal={setModal} categories={categories} setCategories={setCategories} bills={bills} setBills={setBills} schedule={schedule} setSchedule={setSchedule} transactions={transactions} setTransactions={setTransactions} customKeywords={customKeywords} setCustomKeywords={setCustomKeywords} dbStatus={dbStatus} notify={notify} />}
     </div>
   );
 }
 
 // ─── Modal Component ──────────────────────────────────────────────────────────
-function Modal({ modal, setModal, categories, setCategories, bills, setBills, schedule, setSchedule, transactions, setTransactions, notify }) {
+function Modal({ modal, setModal, categories, setCategories, bills, setBills, schedule, setSchedule, transactions, setTransactions, customKeywords, setCustomKeywords, dbStatus, notify }) {
   const [form, setForm] = useState({});
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const close = () => setModal(null);
@@ -798,11 +1017,17 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
       if (!form.description || !form.amount || !form.date) return;
       setTransactions(prev => [{ id: `t_${Date.now()}`, date: form.date, description: form.description, amount: parseFloat(form.amount), categoryId: form.categoryId || "other", note: form.note || "" }, ...prev]);
       notify("Transaction added!");
+    } else if (modal.type === "addKeyword") {
+      if (!form.keyword || !form.categoryId) return;
+      const newKw = { id: `kw_${Date.now()}`, keyword: form.keyword.toLowerCase().trim(), categoryId: form.categoryId };
+      setCustomKeywords(prev => [...prev, newKw]);
+      if (dbStatus === "connected") sb.upsert("custom_keywords", newKw).catch(() => {});
+      notify(`Keyword "${form.keyword}" added!`);
     }
     close();
   };
 
-  const titles = { addCategory: "Add Category", addBill: "Add Bill", addSchedule: "Schedule Event", addTransaction: "Add Transaction" };
+  const titles = { addCategory: "Add Category", addBill: "Add Bill", addSchedule: "Schedule Event", addTransaction: "Add Transaction", addKeyword: "Add Keyword Rule" };
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && close()}>
@@ -860,6 +1085,20 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
               {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             <input className="input" placeholder="Note (optional)" onChange={e => set("note", e.target.value)} />
+          </>}
+
+          {modal.type === "addKeyword" && <>
+            <div style={{ fontSize: 13, color: T.muted, lineHeight: 1.5 }}>
+              When a transaction description contains this keyword, it will automatically be assigned the chosen category. Your rules are checked before the built-in ones.
+            </div>
+            <input className="input" placeholder='Keyword (e.g. "Netflix", "H-E-B", "Shell")' onChange={e => set("keyword", e.target.value)} />
+            <select className="input" onChange={e => set("categoryId", e.target.value)}>
+              <option value="">Select category</option>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <div style={{ fontSize: 12, color: T.muted }}>
+              💡 Tip: Keywords are not case-sensitive. "starbucks" matches "STARBUCKS", "Starbucks", etc.
+            </div>
           </>}
         </div>
 
