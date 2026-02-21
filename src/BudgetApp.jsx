@@ -449,45 +449,88 @@ export default function BudgetApp() {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        let rows = [];
-        if (ext === "csv") {
-          const text = e.target.result;
-          const lines = text.split("\n").filter(Boolean);
-          const headers = lines[0].split(",").map(h => h.trim().toLowerCase().replace(/"/g, ""));
-          const dateCol = headers.findIndex(h => /date/.test(h));
-          const descCol = headers.findIndex(h => /desc|narr|memo|payee|merchant|detail|transaction|particulars|reference/.test(h));
-          const amtCol = headers.findIndex(h => /amount|debit|credit/.test(h));
-          const debitCol = headers.findIndex(h => /debit/.test(h));
-          const creditCol = headers.findIndex(h => /credit/.test(h));
-          lines.slice(1).forEach((line, i) => {
-            const cols = line.split(",").map(c => c.trim().replace(/"/g, ""));
-            const desc = cols[descCol] || `Transaction ${i + 1}`;
-            let amount = 0;
-            if (amtCol >= 0) amount = parseAmount(cols[amtCol]);
-            else if (debitCol >= 0 && creditCol >= 0) {
-              const d = parseAmount(cols[debitCol]);
-              const c = parseAmount(cols[creditCol]);
-              amount = c > 0 ? c : -d;
+        // ── Parse CSV columns ─────────────────────────────────────────────
+        const parseCsvLines = (text) => {
+          // Handle quoted commas properly
+          const lines = [];
+          let cur = "", inQ = false;
+          const rows = [];
+          for (const ch of text) {
+            if (ch === '"') inQ = !inQ;
+            else if (ch === "\n" && !inQ) { rows.push(cur); cur = ""; }
+            else cur += ch;
+          }
+          if (cur.trim()) rows.push(cur);
+          return rows.map(r => {
+            const cols = []; let cell = "", q = false;
+            for (const ch of r) {
+              if (ch === '"') q = !q;
+              else if (ch === "," && !q) { cols.push(cell.trim()); cell = ""; }
+              else cell += ch;
             }
-            rows.push({ id: `t_${Date.now()}_${i}`, date: cols[dateCol] || new Date().toISOString().split("T")[0], description: desc, amount, categoryId: guessCategory(desc, categories, customKeywords), note: "" });
+            cols.push(cell.trim());
+            return cols;
+          });
+        };
+
+        const detectCols = (headers) => {
+          const h = headers.map(x => x.toLowerCase().trim());
+          // Date: must contain "date" but NOT "update"
+          const dateCol = h.findIndex(x => /\bdate\b/.test(x) && !/update/.test(x));
+          // Description: explicitly named merchant/payee/desc/narr/memo but NOT "type"
+          let descCol = h.findIndex(x => /\b(payee|merchant|description|narration|memo|particulars|reference|details|beneficiary)\b/.test(x));
+          // Amount: single amount column
+          let amtCol = h.findIndex(x => x === "amount" || x === "transaction amount" || x === "amt");
+          // Separate debit/credit columns
+          const debitCol = h.findIndex(x => x === "debit" || x === "debit amount" || x === "withdrawals");
+          const creditCol = h.findIndex(x => x === "credit" || x === "credit amount" || x === "deposits");
+          return { dateCol, descCol, amtCol, debitCol, creditCol, headers };
+        };
+
+        let parsedRows = [];
+        let colMap = null;
+        let rawHeaders = [];
+
+        if (ext === "csv") {
+          const allRows = parseCsvLines(e.target.result).filter(r => r.length > 1);
+          rawHeaders = allRows[0];
+          colMap = detectCols(rawHeaders);
+          const dataRows = allRows.slice(1);
+
+          // If description column not confidently found, open column mapper
+          if (colMap.descCol === -1) {
+            setModal({ type: "columnMapper", headers: rawHeaders, dataRows, colMap });
+            return;
+          }
+
+          dataRows.forEach((cols, i) => {
+            const desc = cols[colMap.descCol] || `Transaction ${i + 1}`;
+            let amount = 0;
+            if (colMap.amtCol >= 0) amount = parseAmount(cols[colMap.amtCol]);
+            else if (colMap.debitCol >= 0 || colMap.creditCol >= 0) {
+              const d = colMap.debitCol >= 0 ? parseAmount(cols[colMap.debitCol]) : 0;
+              const c = colMap.creditCol >= 0 ? parseAmount(cols[colMap.creditCol]) : 0;
+              amount = c > 0 ? c : (d > 0 ? -d : 0);
+            }
+            const date = colMap.dateCol >= 0 ? cols[colMap.dateCol] : new Date().toISOString().split("T")[0];
+            parsedRows.push({ id: `t_${Date.now()}_${i}`, date, description: desc.trim(), amount, categoryId: guessCategory(desc, categories, customKeywords), note: "" });
           });
         } else {
-          // Excel via SheetJS
           const XLSX = window.XLSX;
           if (!XLSX) { notify("Excel support requires the XLSX library. Try CSV instead.", "info"); return; }
           const wb = XLSX.read(e.target.result, { type: "binary" });
           const ws = wb.Sheets[wb.SheetNames[0]];
           const json = XLSX.utils.sheet_to_json(ws, { defval: "" });
           json.forEach((row, i) => {
-            const keys = Object.keys(row).map(k => k.toLowerCase());
-            const dateKey = Object.keys(row).find(k => /date/.test(k.toLowerCase()));
-            const descKey = Object.keys(row).find(k => /desc|narr|memo|payee|merchant|detail|transaction|particulars|reference/.test(k.toLowerCase()));
-            const amtKey = Object.keys(row).find(k => /amount|debit|credit/.test(k.toLowerCase()));
-            const desc = (descKey && row[descKey]) || `Transaction ${i + 1}`;
-            rows.push({ id: `t_${Date.now()}_${i}`, date: (dateKey && row[dateKey]) || new Date().toISOString().split("T")[0], description: String(desc), amount: parseAmount(amtKey ? row[amtKey] : 0), categoryId: guessCategory(String(desc), categories, customKeywords), note: "" });
+            const dateKey = Object.keys(row).find(k => /\bdate\b/i.test(k) && !/update/i.test(k));
+            const descKey = Object.keys(row).find(k => /\b(payee|merchant|description|narration|memo|particulars|reference|details)\b/i.test(k));
+            const amtKey = Object.keys(row).find(k => /^(amount|transaction amount|amt)$/i.test(k));
+            const desc = (descKey && String(row[descKey])) || `Transaction ${i + 1}`;
+            parsedRows.push({ id: `t_${Date.now()}_${i}`, date: (dateKey && row[dateKey]) || new Date().toISOString().split("T")[0], description: desc, amount: parseAmount(amtKey ? row[amtKey] : 0), categoryId: guessCategory(desc, categories, customKeywords), note: "" });
           });
         }
-        const valid = rows.filter(r => r.description && !isNaN(r.amount));
+
+        const valid = parsedRows.filter(r => r.description && !isNaN(r.amount));
         setTransactions(prev => [...valid, ...prev]);
         notify(`✓ Imported ${valid.length} transactions!`);
       } catch (err) {
@@ -750,8 +793,8 @@ export default function BudgetApp() {
                         return (
                           <tr key={t.id}>
                             <td style={{ color: T.muted, fontSize: 12, whiteSpace: "nowrap" }}>{t.date}</td>
-                            <td style={{ maxWidth: 220 }}>
-                              <div style={{ fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.description}</div>
+                            <td style={{ maxWidth: 260 }}>
+                              <div style={{ fontWeight: 500, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 240 }} title={t.description}>{t.description}</div>
                               {t.note && <div style={{ fontSize: 11, color: T.muted }}>{t.note}</div>}
                             </td>
                             <td>
@@ -989,13 +1032,196 @@ export default function BudgetApp() {
       </main>
 
       {/* ─ Modals ─ */}
-      {modal && <Modal modal={modal} setModal={setModal} categories={categories} setCategories={setCategories} bills={bills} setBills={setBills} schedule={schedule} setSchedule={setSchedule} transactions={transactions} setTransactions={setTransactions} customKeywords={customKeywords} setCustomKeywords={setCustomKeywords} dbStatus={dbStatus} notify={notify} />}
+      {modal && <Modal modal={modal} setModal={setModal} categories={categories} setCategories={setCategories} bills={bills} setBills={setBills} schedule={schedule} setSchedule={setSchedule} transactions={transactions} setTransactions={setTransactions} customKeywords={customKeywords} setCustomKeywords={setCustomKeywords} dbStatus={dbStatus} notify={notify} guessCategory={guessCategory} />}
+    </div>
+  );
+}
+
+// ─── Column Mapper Component ─────────────────────────────────────────────────
+function ColumnMapper({ modal, categories, customKeywords, setTransactions, notify, close, guessCategory }) {
+  const { headers, dataRows, colMap } = modal;
+  const [map, setMap] = useState({
+    date: colMap.dateCol >= 0 ? colMap.dateCol : -1,
+    desc: colMap.descCol >= 0 ? colMap.descCol : -1,
+    amount: colMap.amtCol >= 0 ? colMap.amtCol : -1,
+    debit: colMap.debitCol >= 0 ? colMap.debitCol : -1,
+    credit: colMap.creditCol >= 0 ? colMap.creditCol : -1,
+  });
+
+  const preview = dataRows.slice(0, 3);
+
+  const parseAmount = (v) => {
+    if (typeof v === "number") return v;
+    const s = String(v).replace(/[$,\s]/g, "");
+    return parseFloat(s) || 0;
+  };
+
+  const handleImport = () => {
+    if (map.desc === -1) { alert("Please select the Description column."); return; }
+    if (map.date === -1) { alert("Please select the Date column."); return; }
+    if (map.amount === -1 && map.debit === -1 && map.credit === -1) { alert("Please select at least an Amount column."); return; }
+
+    const rows = dataRows.map((cols, i) => {
+      const desc = cols[map.desc] || `Transaction ${i + 1}`;
+      let amount = 0;
+      if (map.amount >= 0) amount = parseAmount(cols[map.amount]);
+      else {
+        const d = map.debit >= 0 ? parseAmount(cols[map.debit]) : 0;
+        const c = map.credit >= 0 ? parseAmount(cols[map.credit]) : 0;
+        amount = c > 0 ? c : (d > 0 ? -d : 0);
+      }
+      return { id: `t_${Date.now()}_${i}`, date: cols[map.date] || new Date().toISOString().split("T")[0], description: desc.trim(), amount, categoryId: guessCategory(desc, categories, customKeywords), note: "" };
+    }).filter(r => r.description && !isNaN(r.amount));
+
+    setTransactions(prev => [...rows, ...prev]);
+    notify(`✓ Imported ${rows.length} transactions!`);
+    close();
+  };
+
+  const sel = (field, val) => setMap(m => ({ ...m, [field]: parseInt(val) }));
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ fontSize: 13, color: T.muted, lineHeight: 1.5, background: "rgba(78,205,196,0.07)", border: `1px solid rgba(78,205,196,0.2)`, borderRadius: 10, padding: 12 }}>
+        The app couldn't automatically detect which column contains the merchant/description. Please match each field to the correct column from your file.
+      </div>
+
+      {/* Column selectors */}
+      {[
+        { label: "📅 Date column", field: "date", required: true },
+        { label: "🏪 Description / Merchant column", field: "desc", required: true },
+        { label: "💵 Amount column (single +/- column)", field: "amount", required: false },
+        { label: "📤 Debit / Withdrawal column", field: "debit", required: false },
+        { label: "📥 Credit / Deposit column", field: "credit", required: false },
+      ].map(({ label, field, required }) => (
+        <div key={field}>
+          <div style={{ fontSize: 12, color: T.muted, marginBottom: 4 }}>{label}{required && <span style={{ color: T.coral }}> *</span>}</div>
+          <select className="input" value={map[field]} onChange={e => sel(field, e.target.value)}>
+            <option value={-1}>— Not used —</option>
+            {headers.map((h, i) => <option key={i} value={i}>{h || `Column ${i + 1}`}</option>)}
+          </select>
+        </div>
+      ))}
+
+      {/* Preview */}
+      {map.desc >= 0 && (
+        <div>
+          <div style={{ fontSize: 12, color: T.muted, marginBottom: 6 }}>Preview (first 3 rows):</div>
+          <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 8, overflow: "hidden", border: `1px solid ${T.border}` }}>
+            <table style={{ fontSize: 12 }}>
+              <thead><tr><th>Date</th><th>Description</th><th>Amount</th></tr></thead>
+              <tbody>
+                {preview.map((row, i) => (
+                  <tr key={i}>
+                    <td style={{ color: T.muted }}>{map.date >= 0 ? row[map.date] : "—"}</td>
+                    <td style={{ fontWeight: 500 }}>{map.desc >= 0 ? row[map.desc] : "—"}</td>
+                    <td>{map.amount >= 0 ? row[map.amount] : map.debit >= 0 ? `-${row[map.debit]}` : map.credit >= 0 ? row[map.credit] : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
+        <button className="btn btn-ghost" onClick={close}>Cancel</button>
+        <button className="btn btn-primary" onClick={handleImport}>Import Transactions</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Column Mapper Component ─────────────────────────────────────────────────
+function ColumnMapper({ modal, categories, customKeywords, setTransactions, notify, close, guessCategory }) {
+  const { headers, dataRows, colMap } = modal;
+  const [map, setMap] = useState({
+    date: colMap.dateCol >= 0 ? colMap.dateCol : -1,
+    desc: colMap.descCol >= 0 ? colMap.descCol : -1,
+    amount: colMap.amtCol >= 0 ? colMap.amtCol : -1,
+    debit: colMap.debitCol >= 0 ? colMap.debitCol : -1,
+    credit: colMap.creditCol >= 0 ? colMap.creditCol : -1,
+  });
+
+  const preview = dataRows.slice(0, 3);
+
+  const parseAmt = (v) => {
+    if (typeof v === "number") return v;
+    const s = String(v).replace(/[$,\s]/g, "");
+    return parseFloat(s) || 0;
+  };
+
+  const handleImport = () => {
+    if (map.desc === -1) { alert("Please select the Description column."); return; }
+    if (map.date === -1) { alert("Please select the Date column."); return; }
+    if (map.amount === -1 && map.debit === -1 && map.credit === -1) { alert("Please select at least an Amount column."); return; }
+    const rows = dataRows.map((cols, i) => {
+      const desc = cols[map.desc] || `Transaction ${i + 1}`;
+      let amount = 0;
+      if (map.amount >= 0) amount = parseAmt(cols[map.amount]);
+      else {
+        const d = map.debit >= 0 ? parseAmt(cols[map.debit]) : 0;
+        const c = map.credit >= 0 ? parseAmt(cols[map.credit]) : 0;
+        amount = c > 0 ? c : (d > 0 ? -d : 0);
+      }
+      return { id: `t_${Date.now()}_${i}`, date: cols[map.date] || new Date().toISOString().split("T")[0], description: desc.trim(), amount, categoryId: guessCategory(desc, categories, customKeywords), note: "" };
+    }).filter(r => r.description && !isNaN(r.amount));
+    setTransactions(prev => [...rows, ...prev]);
+    notify(`✓ Imported ${rows.length} transactions!`);
+    close();
+  };
+
+  const sel = (field, val) => setMap(m => ({ ...m, [field]: parseInt(val) }));
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ fontSize: 13, color: T.muted, lineHeight: 1.5, background: "rgba(78,205,196,0.07)", border: `1px solid rgba(78,205,196,0.2)`, borderRadius: 10, padding: 12 }}>
+        The app could not automatically detect which column contains the merchant name. Please match each field to the correct column from your file.
+      </div>
+      {[
+        { label: "📅 Date column", field: "date", required: true },
+        { label: "🏪 Description / Merchant column", field: "desc", required: true },
+        { label: "💵 Amount column (single +/- column)", field: "amount", required: false },
+        { label: "📤 Debit / Withdrawal column", field: "debit", required: false },
+        { label: "📥 Credit / Deposit column", field: "credit", required: false },
+      ].map(({ label, field, required }) => (
+        <div key={field}>
+          <div style={{ fontSize: 12, color: T.muted, marginBottom: 4 }}>{label}{required && <span style={{ color: T.coral }}> *</span>}</div>
+          <select className="input" value={map[field]} onChange={e => sel(field, e.target.value)}>
+            <option value={-1}>— Not used —</option>
+            {headers.map((h, i) => <option key={i} value={i}>{h || `Column ${i + 1}`}</option>)}
+          </select>
+        </div>
+      ))}
+      {map.desc >= 0 && (
+        <div>
+          <div style={{ fontSize: 12, color: T.muted, marginBottom: 6 }}>Preview (first 3 rows):</div>
+          <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 8, overflow: "hidden", border: `1px solid ${T.border}` }}>
+            <table style={{ fontSize: 12 }}>
+              <thead><tr><th>Date</th><th>Description</th><th>Amount</th></tr></thead>
+              <tbody>
+                {preview.map((row, i) => (
+                  <tr key={i}>
+                    <td style={{ color: T.muted }}>{map.date >= 0 ? row[map.date] : "—"}</td>
+                    <td style={{ fontWeight: 500 }}>{map.desc >= 0 ? row[map.desc] : "—"}</td>
+                    <td>{map.amount >= 0 ? row[map.amount] : map.debit >= 0 ? `-${row[map.debit]}` : map.credit >= 0 ? row[map.credit] : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
+        <button className="btn btn-ghost" onClick={close}>Cancel</button>
+        <button className="btn btn-primary" onClick={handleImport}>Import Transactions</button>
+      </div>
     </div>
   );
 }
 
 // ─── Modal Component ──────────────────────────────────────────────────────────
-function Modal({ modal, setModal, categories, setCategories, bills, setBills, schedule, setSchedule, transactions, setTransactions, customKeywords, setCustomKeywords, dbStatus, notify }) {
+function Modal({ modal, setModal, categories, setCategories, bills, setBills, schedule, setSchedule, transactions, setTransactions, customKeywords, setCustomKeywords, dbStatus, notify, guessCategory }) {
   const [form, setForm] = useState({});
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const close = () => setModal(null);
@@ -1027,7 +1253,7 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
     close();
   };
 
-  const titles = { addCategory: "Add Category", addBill: "Add Bill", addSchedule: "Schedule Event", addTransaction: "Add Transaction", addKeyword: "Add Keyword Rule" };
+  const titles = { addCategory: "Add Category", addBill: "Add Bill", addSchedule: "Schedule Event", addTransaction: "Add Transaction", addKeyword: "Add Keyword Rule", columnMapper: "Match Your CSV Columns" };
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && close()}>
@@ -1100,12 +1326,16 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
               💡 Tip: Keywords are not case-sensitive. "starbucks" matches "STARBUCKS", "Starbucks", etc.
             </div>
           </>}
+
+          {modal.type === "columnMapper" && <ColumnMapper modal={modal} categories={categories} customKeywords={customKeywords} setTransactions={setTransactions} notify={notify} close={close} guessCategory={guessCategory} />}
         </div>
 
-        <div style={{ display: "flex", gap: 8, marginTop: 20, justifyContent: "flex-end" }}>
-          <button className="btn btn-ghost" onClick={close}>Cancel</button>
-          <button className="btn btn-primary" onClick={submit}>Save</button>
-        </div>
+        {modal.type !== "columnMapper" && (
+          <div style={{ display: "flex", gap: 8, marginTop: 20, justifyContent: "flex-end" }}>
+            <button className="btn btn-ghost" onClick={close}>Cancel</button>
+            <button className="btn btn-primary" onClick={submit}>Save</button>
+          </div>
+        )}
       </div>
     </div>
   );
