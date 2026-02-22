@@ -307,6 +307,8 @@ const css = `
   .input option { background: ${T.card}; }
   .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
   .modal { background: ${T.card}; border: 1px solid ${T.border}; border-radius: 20px; padding: 28px; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; }
+  .modal.wide { max-width: 720px; }
+  .modal.wide { max-width: 720px; }
   .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-radius: 12px; cursor: pointer; transition: all 0.2s; font-size: 14px; font-weight: 500; color: ${T.muted}; border: none; background: none; width: 100%; }
   .nav-item:hover { background: rgba(255,255,255,0.05); color: ${T.text}; }
   .nav-item.active { background: rgba(78,205,196,0.12); color: ${T.teal}; }
@@ -850,20 +852,33 @@ export default function BudgetApp() {
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
               {categories.map(cat => {
-                const spent = Math.abs(transactions.filter(t => t.categoryId === cat.id && t.amount < 0).reduce((s, t) => s + t.amount, 0));
+                const catTxns = transactions.filter(t => t.categoryId === cat.id);
+                const spent = Math.abs(catTxns.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0));
                 const pct = cat.budget > 0 ? Math.min((spent / cat.budget) * 100, 100) : 0;
                 const over = cat.budget > 0 && spent > cat.budget;
+                const txnCount = catTxns.length;
                 return (
-                  <div key={cat.id} className="card" style={{ position: "relative" }}>
+                  <div key={cat.id} className="card" style={{ position: "relative", cursor: txnCount > 0 ? "pointer" : "default", transition: "border-color 0.2s", borderColor: T.border }}
+                    onClick={() => txnCount > 0 && setModal({ type: "categoryDrilldown", cat })}
+                    onMouseEnter={e => { if (txnCount > 0) e.currentTarget.style.borderColor = cat.color; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <div style={{ width: 10, height: 10, borderRadius: "50%", background: cat.color, boxShadow: `0 0 8px ${cat.color}60` }} />
                         <span style={{ fontWeight: 600 }}>{cat.name}</span>
                         <span className="tag" style={{ background: `rgba(255,255,255,0.06)`, color: T.muted, fontSize: 10 }}>{cat.type}</span>
                       </div>
-                      <button className="btn btn-danger" style={{ padding: "3px 7px" }} onClick={() => { setCategories(prev => prev.filter(c => c.id !== cat.id)); if(dbStatus==="connected") sb.remove("categories", cat.id); }}>
-                        <Trash2 size={12} />
-                      </button>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        {txnCount > 0 && (
+                          <span style={{ fontSize: 11, color: cat.color, background: `${cat.color}15`, padding: "2px 8px", borderRadius: 20 }}>
+                            {txnCount} txn{txnCount !== 1 ? "s" : ""}
+                          </span>
+                        )}
+                        <button className="btn btn-danger" style={{ padding: "3px 7px" }}
+                          onClick={e => { e.stopPropagation(); setCategories(prev => prev.filter(c => c.id !== cat.id)); if(dbStatus==="connected") sb.remove("categories", cat.id); }}>
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                       <span style={{ fontSize: 13, color: T.muted }}>Spent</span>
@@ -876,6 +891,12 @@ export default function BudgetApp() {
                         </div>
                         {over && <div style={{ fontSize: 11, color: T.coral, marginTop: 4 }}>⚠ Over budget by {fmt(spent - cat.budget)}</div>}
                       </>
+                    )}
+                    {txnCount > 0 && (
+                      <div style={{ fontSize: 11, color: T.muted, marginTop: 8, display: "flex", alignItems: "center", gap: 4 }}>
+                        <span>Click to view transactions</span>
+                        <ArrowRight size={11} />
+                      </div>
                     )}
                   </div>
                 );
@@ -1046,6 +1067,103 @@ export default function BudgetApp() {
   );
 }
 
+// ─── Category Drilldown Component ────────────────────────────────────────────
+function CategoryDrilldown({ modal, categories, transactions, setTransactions, dbStatus, notify, close }) {
+  const { cat } = modal;
+  const [search, setSearch] = useState("");
+
+  const catTxns = transactions
+    .filter(t => t.categoryId === cat.id)
+    .filter(t => search === "" || t.description.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  const total = catTxns.reduce((s, t) => s + t.amount, 0);
+  const fmt = (n) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(n || 0);
+
+  const recat = (txnId, newCatId) => {
+    setTransactions(prev => prev.map(t => t.id === txnId ? { ...t, categoryId: newCatId } : t));
+    if (dbStatus === "connected") sb.update("transactions", txnId, { category_id: newCatId }).catch(() => {});
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {/* Summary bar */}
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ flex: 1, background: `${cat.color}12`, border: `1px solid ${cat.color}30`, borderRadius: 10, padding: "10px 14px" }}>
+          <div style={{ fontSize: 11, color: T.muted }}>Transactions</div>
+          <div style={{ fontFamily: "Syne", fontSize: 20, fontWeight: 700, color: cat.color }}>{transactions.filter(t => t.categoryId === cat.id).length}</div>
+        </div>
+        <div style={{ flex: 1, background: `${cat.color}12`, border: `1px solid ${cat.color}30`, borderRadius: 10, padding: "10px 14px" }}>
+          <div style={{ fontSize: 11, color: T.muted }}>Total Spent</div>
+          <div style={{ fontFamily: "Syne", fontSize: 20, fontWeight: 700, color: cat.color }}>
+            {fmt(Math.abs(transactions.filter(t => t.categoryId === cat.id && t.amount < 0).reduce((s, t) => s + t.amount, 0)))}
+          </div>
+        </div>
+      </div>
+
+      {/* Search */}
+      <input
+        className="input"
+        placeholder="Search transactions..."
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        style={{ fontSize: 13 }}
+      />
+
+      {/* Transaction list */}
+      <div style={{ maxHeight: 420, overflowY: "auto", borderRadius: 10, border: `1px solid ${T.border}`, background: "rgba(255,255,255,0.02)" }}>
+        {catTxns.length === 0 ? (
+          <div style={{ padding: 24, textAlign: "center", color: T.muted, fontSize: 13 }}>
+            {search ? "No matching transactions" : "No transactions in this category"}
+          </div>
+        ) : (
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: "left", padding: "10px 14px", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: T.muted, borderBottom: `1px solid ${T.border}` }}>Date</th>
+                <th style={{ textAlign: "left", padding: "10px 14px", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: T.muted, borderBottom: `1px solid ${T.border}` }}>Description</th>
+                <th style={{ textAlign: "left", padding: "10px 14px", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: T.muted, borderBottom: `1px solid ${T.border}` }}>Move to</th>
+                <th style={{ textAlign: "right", padding: "10px 14px", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: T.muted, borderBottom: `1px solid ${T.border}` }}>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {catTxns.map((t, i) => (
+                <tr key={t.id} style={{ borderBottom: i < catTxns.length - 1 ? `1px solid rgba(42,40,80,0.5)` : "none" }}>
+                  <td style={{ padding: "10px 14px", fontSize: 12, color: T.muted, whiteSpace: "nowrap" }}>{t.date}</td>
+                  <td style={{ padding: "10px 14px", maxWidth: 200 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={t.description}>
+                      {t.description}
+                    </div>
+                  </td>
+                  <td style={{ padding: "10px 14px" }}>
+                    <select
+                      style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${T.border}`, borderRadius: 8, padding: "4px 8px", color: T.text, fontSize: 12, outline: "none", cursor: "pointer" }}
+                      value={t.categoryId || ""}
+                      onChange={e => recat(t.id, e.target.value)}>
+                      {categories.map(c => <option key={c.id} value={c.id} style={{ background: T.card }}>{c.name}</option>)}
+                    </select>
+                  </td>
+                  <td style={{ padding: "10px 14px", textAlign: "right", fontWeight: 600, fontSize: 13, color: t.amount >= 0 ? T.green : T.coral, whiteSpace: "nowrap" }}>
+                    {t.amount >= 0 ? "+" : ""}{fmt(t.amount)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div style={{ fontSize: 12, color: T.muted, textAlign: "center" }}>
+        Changes save automatically. Reassigning a transaction moves it out of this category immediately.
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button className="btn btn-primary" onClick={close}>Done</button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Column Mapper Component ─────────────────────────────────────────────────
 function ColumnMapper({ modal, categories, customKeywords, setTransactions, notify, close, guessCategory }) {
   const { headers, dataRows, colMap } = modal;
@@ -1175,13 +1293,20 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
     close();
   };
 
-  const titles = { addCategory: "Add Category", addBill: "Add Bill", addSchedule: "Schedule Event", addTransaction: "Add Transaction", addKeyword: "Add Keyword Rule", columnMapper: "Match Your CSV Columns" };
+  const titles = { addCategory: "Add Category", addBill: "Add Bill", addSchedule: "Schedule Event", addTransaction: "Add Transaction", addKeyword: "Add Keyword Rule", columnMapper: "Match Your CSV Columns", categoryDrilldown: "" };
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && close()}>
-      <div className="modal">
+      <div className={`modal ${modal.type === "categoryDrilldown" ? "wide" : ""}`}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <div style={{ fontFamily: "Syne", fontSize: 18, fontWeight: 700 }}>{titles[modal.type]}</div>
+          <div style={{ fontFamily: "Syne", fontSize: 18, fontWeight: 700 }}>
+            {modal.type === "categoryDrilldown" ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 12, height: 12, borderRadius: "50%", background: modal.cat?.color }} />
+                {modal.cat?.name}
+              </div>
+            ) : titles[modal.type]}
+          </div>
           <button style={{ background: "none", border: "none", color: T.muted, cursor: "pointer" }} onClick={close}><X size={20} /></button>
         </div>
 
@@ -1250,9 +1375,10 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
           </>}
 
           {modal.type === "columnMapper" && <ColumnMapper modal={modal} categories={categories} customKeywords={customKeywords} setTransactions={setTransactions} notify={notify} close={close} guessCategory={guessCategory} />}
+          {modal.type === "categoryDrilldown" && <CategoryDrilldown modal={modal} categories={categories} transactions={transactions} setTransactions={setTransactions} dbStatus={dbStatus} notify={notify} close={close} />}
         </div>
 
-        {modal.type !== "columnMapper" && (
+        {modal.type !== "columnMapper" && modal.type !== "categoryDrilldown" && (
           <div style={{ display: "flex", gap: 8, marginTop: 20, justifyContent: "flex-end" }}>
             <button className="btn btn-ghost" onClick={close}>Cancel</button>
             <button className="btn btn-primary" onClick={submit}>Save</button>
