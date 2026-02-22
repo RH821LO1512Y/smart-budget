@@ -365,6 +365,10 @@ export default function BudgetApp() {
     { id: "s2", date: "2026-03-01", type: "bill", amount: 1500, note: "Rent due", from: "Checking", to: "Landlord" },
   ]);
   const [customKeywords, setCustomKeywords] = useState([]);
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
   const [savingsGoals, setSavingsGoals] = useState([
     { id: "sg_emergency", name: "Emergency Fund", targetAmount: 5000, color: "#4ADE80", emoji: "🛡️", note: "3-6 months of expenses" },
     { id: "sg_vacation",  name: "Vacation",       targetAmount: 2000, color: "#67E8F9", emoji: "✈️", note: "Summer 2026" },
@@ -563,14 +567,23 @@ export default function BudgetApp() {
   }, [categories]);
 
   // ── Computed ─────────────────────────────────────────────────────────────
-  const totalIncome = transactions.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
-  const totalExpense = Math.abs(transactions.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0));
+  // Filter transactions to selected month for all budget calculations
+  const monthTxns = transactions.filter(t => {
+    if (!t.date) return false;
+    const d = new Date(t.date);
+    if (isNaN(d)) return false;
+    const tMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    return tMonth === selectedMonth;
+  });
+
+  const totalIncome = monthTxns.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
+  const totalExpense = Math.abs(monthTxns.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0));
   const netBalance = totalIncome - totalExpense;
-  const savings = transactions.filter(t => { const c = categories.find(c => c.id === t.categoryId); return c?.type === "savings" && t.amount < 0; }).reduce((s, t) => s + Math.abs(t.amount), 0);
+  const savings = monthTxns.filter(t => { const c = categories.find(c => c.id === t.categoryId); return c?.type === "savings" && t.amount < 0; }).reduce((s, t) => s + Math.abs(t.amount), 0);
 
   const expenseByCategory = categories.filter(c => c.type === "expense").map(c => ({
     name: c.name,
-    value: Math.abs(transactions.filter(t => t.categoryId === c.id && t.amount < 0).reduce((s, t) => s + t.amount, 0)),
+    value: Math.abs(monthTxns.filter(t => t.categoryId === c.id && t.amount < 0).reduce((s, t) => s + t.amount, 0)),
     color: c.color,
   })).filter(c => c.value > 0);
 
@@ -641,7 +654,29 @@ export default function BudgetApp() {
             {n.label}
           </button>
         ))}
-        <div style={{ marginTop: "auto", padding: "16px 8px 0", borderTop: `1px solid ${T.border}` }}>
+        {/* Month Selector */}
+        <div style={{ padding: "14px 8px", borderTop: `1px solid ${T.border}`, marginTop: 8 }}>
+          <div style={{ fontSize: 11, color: T.muted, marginBottom: 6 }}>Viewing Month</div>
+          <select
+            className="input"
+            style={{ fontSize: 13, padding: "7px 10px", width: "100%" }}
+            value={selectedMonth}
+            onChange={e => setSelectedMonth(e.target.value)}>
+            {(() => {
+              const opts = [];
+              const now = new Date();
+              for (let i = 0; i < 12; i++) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+                const label = d.toLocaleString("default", { month: "long", year: "numeric" });
+                opts.push(<option key={val} value={val}>{label}</option>);
+              }
+              return opts;
+            })()}
+          </select>
+        </div>
+
+        <div style={{ padding: "16px 8px 0", borderTop: `1px solid ${T.border}` }}>
           <div style={{ fontSize: 11, color: T.muted }}>Storage</div>
           <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
             {dbStatus === "connected" && <>
@@ -675,7 +710,7 @@ export default function BudgetApp() {
           <div className="fade-in">
             <h1 style={{ fontFamily: "Syne", fontSize: 26, fontWeight: 700, marginBottom: 4 }}>Overview</h1>
             <p style={{ color: T.muted, fontSize: 14, marginBottom: 24 }}>
-              {transactions.length === 0 ? "Upload your bank transactions to get started →" : `Analyzing ${transactions.length} transactions`}
+              {transactions.length === 0 ? "Upload your bank transactions to get started →" : `Showing ${monthTxns.length} transactions for ${new Date(selectedMonth + "-02").toLocaleString("default", { month: "long", year: "numeric" })}`}
             </p>
 
             {/* Stat cards */}
@@ -863,13 +898,14 @@ export default function BudgetApp() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
               {categories.filter(cat => cat.type !== "savings").map(cat => {
                 const catTxns = transactions.filter(t => t.categoryId === cat.id);
-                const spent = Math.abs(catTxns.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0));
+                const catMonthTxns = monthTxns.filter(t => t.categoryId === cat.id);
+                const spent = Math.abs(catMonthTxns.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0));
                 const pct = cat.budget > 0 ? Math.min((spent / cat.budget) * 100, 100) : 0;
                 const over = cat.budget > 0 && spent > cat.budget;
-                const txnCount = catTxns.length;
+                const txnCount = catMonthTxns.length;
                 return (
                   <div key={cat.id} className="card" style={{ position: "relative", cursor: txnCount > 0 ? "pointer" : "default", transition: "border-color 0.2s", borderColor: T.border }}
-                    onClick={() => txnCount > 0 && setModal({ type: "categoryDrilldown", cat })}
+                    onClick={() => txnCount > 0 && setModal({ type: "categoryDrilldown", cat, selectedMonth })}
                     onMouseEnter={e => { if (txnCount > 0) e.currentTarget.style.borderColor = cat.color; }}
                     onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -1258,12 +1294,21 @@ function CategoryDrilldown({ modal, categories, transactions, setTransactions, d
   const { cat } = modal;
   const [search, setSearch] = useState("");
 
+  const selectedMonth = modal.selectedMonth;
   const catTxns = transactions
     .filter(t => t.categoryId === cat.id)
+    .filter(t => {
+      if (!selectedMonth || !t.date) return true;
+      const d = new Date(t.date);
+      if (isNaN(d)) return true;
+      const tMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      return tMonth === selectedMonth;
+    })
     .filter(t => search === "" || t.description.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => new Date(b.date) - new Date(a.date));
 
   const total = catTxns.reduce((s, t) => s + t.amount, 0);
+  const monthLabel = selectedMonth ? new Date(selectedMonth + "-02").toLocaleString("default", { month: "long", year: "numeric" }) : "All Time";
   const fmt = (n) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(n || 0);
 
   const recat = (txnId, newCatId) => {
@@ -1276,13 +1321,13 @@ function CategoryDrilldown({ modal, categories, transactions, setTransactions, d
       {/* Summary bar */}
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
         <div style={{ flex: 1, background: `${cat.color}12`, border: `1px solid ${cat.color}30`, borderRadius: 10, padding: "10px 14px" }}>
-          <div style={{ fontSize: 11, color: T.muted }}>Transactions</div>
-          <div style={{ fontFamily: "Syne", fontSize: 20, fontWeight: 700, color: cat.color }}>{transactions.filter(t => t.categoryId === cat.id).length}</div>
+          <div style={{ fontSize: 11, color: T.muted }}>Transactions in {monthLabel}</div>
+          <div style={{ fontFamily: "Syne", fontSize: 20, fontWeight: 700, color: cat.color }}>{catTxns.length}</div>
         </div>
         <div style={{ flex: 1, background: `${cat.color}12`, border: `1px solid ${cat.color}30`, borderRadius: 10, padding: "10px 14px" }}>
-          <div style={{ fontSize: 11, color: T.muted }}>Total Spent</div>
+          <div style={{ fontSize: 11, color: T.muted }}>Total Spent in {monthLabel}</div>
           <div style={{ fontFamily: "Syne", fontSize: 20, fontWeight: 700, color: cat.color }}>
-            {fmt(Math.abs(transactions.filter(t => t.categoryId === cat.id && t.amount < 0).reduce((s, t) => s + t.amount, 0)))}
+            {fmt(Math.abs(catTxns.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0)))}
           </div>
         </div>
       </div>
