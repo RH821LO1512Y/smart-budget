@@ -480,10 +480,10 @@ export default function BudgetApp() {
           // Description: explicitly named merchant/payee/desc/narr/memo but NOT "type"
           let descCol = h.findIndex(x => /\b(payee|merchant|description|narration|memo|particulars|reference|details|beneficiary)\b/.test(x));
           // Amount: single amount column
-          let amtCol = h.findIndex(x => x === "amount" || x === "transaction amount" || x === "amt");
+          let amtCol = h.findIndex(x => /^(amount|transaction amount|amt|transaction amt|net amount|running balance)$/.test(x));
           // Separate debit/credit columns
-          const debitCol = h.findIndex(x => x === "debit" || x === "debit amount" || x === "withdrawals");
-          const creditCol = h.findIndex(x => x === "credit" || x === "credit amount" || x === "deposits");
+          const debitCol = h.findIndex(x => /^(debit|debit amount|withdrawals|withdrawal amount|money out)$/.test(x));
+          const creditCol = h.findIndex(x => /^(credit|credit amount|deposits|deposit amount|money in)$/.test(x));
           return { dateCol, descCol, amtCol, debitCol, creditCol, headers };
         };
 
@@ -496,6 +496,15 @@ export default function BudgetApp() {
           rawHeaders = allRows[0];
           colMap = detectCols(rawHeaders);
           const dataRows = allRows.slice(1);
+
+          // Validate the detected description column — if it only contains
+          // generic banking words like DEBIT/CREDIT, it's the wrong column
+          const JUNK_DESC = /^(debit|credit|ach|pos|atm|chk|check|wire|transfer|withdrawal|deposit|payment|purchase|fee|charge|debit card|credit card)$/i;
+          if (colMap.descCol >= 0) {
+            const sample = dataRows.slice(0, 10).map(r => (r[colMap.descCol] || "").trim());
+            const allJunk = sample.filter(Boolean).every(v => JUNK_DESC.test(v));
+            if (allJunk) colMap.descCol = -1; // reject — force column mapper
+          }
 
           // If description column not confidently found, open column mapper
           if (colMap.descCol === -1) {
