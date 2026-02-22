@@ -4,7 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend,
   LineChart, Line, Area, AreaChart
 } from "recharts";
-import { Upload, DollarSign, TrendingUp, TrendingDown, CreditCard, Calendar, Tag, CheckCircle, Circle, Plus, Trash2, X, ChevronLeft, ChevronRight, ArrowRight, AlertCircle } from "lucide-react";
+import { Upload, DollarSign, TrendingUp, TrendingDown, CreditCard, Calendar, Tag, CheckCircle, Circle, Plus, Trash2, X, ChevronLeft, ChevronRight, ArrowRight, AlertCircle, PiggyBank, Target, Edit2 } from "lucide-react";
 
 // ─── Google Fonts ─────────────────────────────────────────────────────────────
 const fontLink = document.createElement("link");
@@ -214,6 +214,7 @@ const guessCategory = (desc = "", cats, customKeywords = []) => {
 const SUPABASE_URL = "https://mlsnwxuyvfzqqextcems.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_Wof2d5MpMxvckU7gNOyP0g_9YhCvf6T";
 
+
 // Lightweight Supabase REST helper (no npm package needed)
 const sb = {
   headers: {
@@ -364,6 +365,10 @@ export default function BudgetApp() {
     { id: "s2", date: "2026-03-01", type: "bill", amount: 1500, note: "Rent due", from: "Checking", to: "Landlord" },
   ]);
   const [customKeywords, setCustomKeywords] = useState([]);
+  const [savingsGoals, setSavingsGoals] = useState([
+    { id: "sg_emergency", name: "Emergency Fund", targetAmount: 5000, color: "#4ADE80", emoji: "🛡️", note: "3-6 months of expenses" },
+    { id: "sg_vacation",  name: "Vacation",       targetAmount: 2000, color: "#67E8F9", emoji: "✈️", note: "Summer 2026" },
+  ]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [uploadDrag, setUploadDrag] = useState(false);
@@ -390,6 +395,8 @@ export default function BudgetApp() {
           if (bls.length) setBills(bls);
           if (sched.length) setSchedule(sched);
           if (kwds.length) setCustomKeywords(kwds);
+          const goals = await sb.getAll("savings_goals");
+          if (goals.length) setSavingsGoals(goals);
           setDbStatus("connected");
         } catch (e) {
           console.warn("Supabase load failed, falling back to local", e);
@@ -410,6 +417,7 @@ export default function BudgetApp() {
           if (saved.bills) setBills(saved.bills);
           if (saved.schedule) setSchedule(saved.schedule);
           if (saved.customKeywords) setCustomKeywords(saved.customKeywords);
+          if (saved.savingsGoals) setSavingsGoals(saved.savingsGoals);
         }
         setDbStatus("local");
       }
@@ -427,10 +435,11 @@ export default function BudgetApp() {
       sb.upsertMany("bills", bills).catch(() => {});
       sb.upsertMany("schedule", schedule).catch(() => {});
       sb.upsertMany("custom_keywords", customKeywords).catch(() => {});
+      sb.upsertMany("savings_goals", savingsGoals).catch(() => {});
     } else {
-      localSave({ transactions, categories, bills, schedule, customKeywords });
+      localSave({ transactions, categories, bills, schedule, customKeywords, savingsGoals });
     }
-  }, [transactions, categories, bills, schedule, customKeywords, loading, dbStatus]);
+  }, [transactions, categories, bills, schedule, customKeywords, savingsGoals, loading, dbStatus]);
 
   const notify = (msg, type = "success") => {
     setNotification({ msg, type });
@@ -590,11 +599,12 @@ export default function BudgetApp() {
 
   // ── Tabs ─────────────────────────────────────────────────────────────────
   const NAV = [
-    { id: "dashboard", icon: TrendingUp, label: "Dashboard" },
+    { id: "dashboard",    icon: TrendingUp, label: "Dashboard"    },
     { id: "transactions", icon: DollarSign, label: "Transactions" },
-    { id: "categories", icon: Tag, label: "Categories" },
-    { id: "bills", icon: CreditCard, label: "Bills" },
-    { id: "schedule", icon: Calendar, label: "Schedule" },
+    { id: "categories",   icon: Tag,        label: "Categories"   },
+    { id: "savings",      icon: PiggyBank,  label: "Savings"      },
+    { id: "bills",        icon: CreditCard, label: "Bills"        },
+    { id: "schedule",     icon: Calendar,   label: "Schedule"     },
   ];
 
   if (loading) return (
@@ -851,7 +861,7 @@ export default function BudgetApp() {
               </button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
-              {categories.map(cat => {
+              {categories.filter(cat => cat.type !== "savings").map(cat => {
                 const catTxns = transactions.filter(t => t.categoryId === cat.id);
                 const spent = Math.abs(catTxns.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0));
                 const pct = cat.budget > 0 ? Math.min((spent / cat.budget) * 100, 100) : 0;
@@ -977,6 +987,182 @@ export default function BudgetApp() {
           </div>
         )}
 
+        {/* ─ Savings ─ */}
+        {tab === "savings" && (() => {
+          // Pull all transactions tagged to savings-type categories
+          const savCatIds = categories.filter(c => c.type === "savings").map(c => c.id);
+          const savTxns = transactions.filter(t => savCatIds.includes(t.categoryId));
+          const totalSaved = savTxns.reduce((s, t) => s + Math.abs(t.amount), 0);
+          const totalGoalTarget = savingsGoals.reduce((s, g) => s + (g.targetAmount || 0), 0);
+          const overallPct = totalGoalTarget > 0 ? Math.min((totalSaved / totalGoalTarget) * 100, 100) : 0;
+
+          return (
+            <div className="fade-in">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
+                <div>
+                  <h1 style={{ fontFamily: "Syne", fontSize: 26, fontWeight: 700 }}>Savings</h1>
+                  <p style={{ color: T.muted, fontSize: 14 }}>Track your goals and watch them grow</p>
+                </div>
+                <button className="btn btn-primary" onClick={() => setModal({ type: "addSavingsGoal" })}>
+                  <Plus size={15} /> Add Goal
+                </button>
+              </div>
+
+              {/* Total savings summary */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14, marginBottom: 28 }}>
+                <div className="card" style={{ background: "linear-gradient(135deg, rgba(74,222,128,0.12), rgba(78,205,196,0.08))", border: `1px solid rgba(74,222,128,0.25)` }}>
+                  <div style={{ fontSize: 12, color: T.muted, marginBottom: 6 }}>Total Saved</div>
+                  <div style={{ fontFamily: "Syne", fontSize: 30, fontWeight: 800, color: "#4ADE80" }}>{fmt(totalSaved)}</div>
+                  <div style={{ fontSize: 12, color: T.muted, marginTop: 4 }}>Across all savings categories</div>
+                </div>
+                <div className="card">
+                  <div style={{ fontSize: 12, color: T.muted, marginBottom: 6 }}>Total Goal Target</div>
+                  <div style={{ fontFamily: "Syne", fontSize: 30, fontWeight: 800, color: T.teal }}>{fmt(totalGoalTarget)}</div>
+                  <div style={{ fontSize: 12, color: T.muted, marginTop: 4 }}>{savingsGoals.length} active goal{savingsGoals.length !== 1 ? "s" : ""}</div>
+                </div>
+                <div className="card">
+                  <div style={{ fontSize: 12, color: T.muted, marginBottom: 8 }}>Overall Progress</div>
+                  <div style={{ fontFamily: "Syne", fontSize: 30, fontWeight: 800, color: T.yellow }}>{overallPct.toFixed(0)}%</div>
+                  <div style={{ marginTop: 8 }}>
+                    <div className="progress-bar" style={{ height: 8 }}>
+                      <div className="progress-fill" style={{ width: `${overallPct}%`, background: `linear-gradient(90deg, #4ADE80, ${T.teal})` }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Individual goals */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
+                {savingsGoals.map(goal => {
+                  // Saved amount = transactions in categories matching this goal's linkedCategoryId, or all savings if unlinked
+                  const linked = goal.linkedCategoryId
+                    ? transactions.filter(t => t.categoryId === goal.linkedCategoryId)
+                    : [];
+                  const goalSaved = goal.linkedCategoryId
+                    ? linked.reduce((s, t) => s + Math.abs(t.amount), 0)
+                    : 0;
+                  const manualSaved = goal.manualAmount || 0;
+                  const totalGoalSaved = goalSaved + manualSaved;
+                  const pct = goal.targetAmount > 0 ? Math.min((totalGoalSaved / goal.targetAmount) * 100, 100) : 0;
+                  const remaining = Math.max(0, (goal.targetAmount || 0) - totalGoalSaved);
+                  const isComplete = pct >= 100;
+
+                  return (
+                    <div key={goal.id} className="card" style={{ border: `1px solid ${isComplete ? goal.color : T.border}`, position: "relative", overflow: "hidden" }}>
+                      {/* Completion glow */}
+                      {isComplete && <div style={{ position: "absolute", inset: 0, background: `${goal.color}08`, pointerEvents: "none" }} />}
+
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <span style={{ fontSize: 24 }}>{goal.emoji || "🎯"}</span>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 15 }}>{goal.name}</div>
+                            {goal.note && <div style={{ fontSize: 12, color: T.muted }}>{goal.note}</div>}
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button className="btn btn-ghost" style={{ padding: "3px 7px" }}
+                            onClick={() => setModal({ type: "editSavingsGoal", goal })}>
+                            <Edit2 size={12} />
+                          </button>
+                          <button className="btn btn-danger" style={{ padding: "3px 7px" }}
+                            onClick={() => { setSavingsGoals(prev => prev.filter(g => g.id !== goal.id)); if(dbStatus==="connected") sb.remove("savings_goals", goal.id); }}>
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Progress */}
+                      <div style={{ marginBottom: 10 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                          <span style={{ fontFamily: "Syne", fontSize: 20, fontWeight: 700, color: goal.color }}>
+                            {fmt(totalGoalSaved)}
+                          </span>
+                          <span style={{ fontSize: 13, color: T.muted }}>of {fmt(goal.targetAmount)}</span>
+                        </div>
+                        <div className="progress-bar" style={{ height: 10, borderRadius: 6 }}>
+                          <div className="progress-fill" style={{ width: `${pct}%`, background: isComplete ? `linear-gradient(90deg, ${goal.color}, #fff8)` : goal.color, borderRadius: 6, transition: "width 0.8s ease" }} />
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
+                          <span style={{ fontSize: 12, color: isComplete ? goal.color : T.muted }}>
+                            {isComplete ? "🎉 Goal reached!" : `${pct.toFixed(0)}% complete`}
+                          </span>
+                          {!isComplete && <span style={{ fontSize: 12, color: T.muted }}>{fmt(remaining)} to go</span>}
+                        </div>
+                      </div>
+
+                      {/* Manual amount input */}
+                      <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 10, marginTop: 4 }}>
+                        <div style={{ fontSize: 11, color: T.muted, marginBottom: 6 }}>Manually track saved amount:</div>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <input
+                            type="number"
+                            className="input"
+                            placeholder="0.00"
+                            defaultValue={goal.manualAmount || ""}
+                            style={{ fontSize: 13, padding: "6px 10px" }}
+                            onBlur={e => {
+                              const val = parseFloat(e.target.value) || 0;
+                              setSavingsGoals(prev => prev.map(g => g.id === goal.id ? { ...g, manualAmount: val } : g));
+                            }}
+                          />
+                          <span style={{ fontSize: 12, color: T.muted, alignSelf: "center", whiteSpace: "nowrap" }}>saved so far</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Empty state */}
+                {savingsGoals.length === 0 && (
+                  <div className="card" style={{ gridColumn: "1 / -1", textAlign: "center", padding: 60 }}>
+                    <div style={{ fontSize: 48, marginBottom: 12 }}>🐷</div>
+                    <div style={{ fontFamily: "Syne", fontSize: 18, fontWeight: 600, marginBottom: 8 }}>No savings goals yet</div>
+                    <div style={{ color: T.muted, marginBottom: 20, fontSize: 14 }}>Set a goal and start tracking your progress!</div>
+                    <button className="btn btn-primary" onClick={() => setModal({ type: "addSavingsGoal" })}>
+                      <Plus size={15} /> Add Your First Goal
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Recent savings transactions */}
+              {savTxns.length > 0 && (
+                <div style={{ marginTop: 28 }}>
+                  <div style={{ fontFamily: "Syne", fontSize: 16, fontWeight: 700, marginBottom: 14 }}>Recent Savings Transactions</div>
+                  <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+                    <div style={{ overflowX: "auto" }}>
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Date</th>
+                            <th>Description</th>
+                            <th>Category</th>
+                            <th style={{ textAlign: "right" }}>Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {savTxns.slice(0, 20).map(t => {
+                            const cat = categories.find(c => c.id === t.categoryId);
+                            return (
+                              <tr key={t.id}>
+                                <td style={{ color: T.muted, fontSize: 12 }}>{t.date}</td>
+                                <td style={{ fontSize: 13, fontWeight: 500 }}>{t.description}</td>
+                                <td><CategoryBadge category={cat} /></td>
+                                <td style={{ textAlign: "right", fontWeight: 600, color: "#4ADE80" }}>+{fmt(Math.abs(t.amount))}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* ─ Bills ─ */}
         {tab === "bills" && (
           <div className="fade-in">
@@ -1062,7 +1248,7 @@ export default function BudgetApp() {
       </main>
 
       {/* ─ Modals ─ */}
-      {modal && <Modal modal={modal} setModal={setModal} categories={categories} setCategories={setCategories} bills={bills} setBills={setBills} schedule={schedule} setSchedule={setSchedule} transactions={transactions} setTransactions={setTransactions} customKeywords={customKeywords} setCustomKeywords={setCustomKeywords} dbStatus={dbStatus} notify={notify} guessCategory={guessCategory} />}
+      {modal && <Modal modal={modal} setModal={setModal} categories={categories} setCategories={setCategories} bills={bills} setBills={setBills} schedule={schedule} setSchedule={setSchedule} transactions={transactions} setTransactions={setTransactions} customKeywords={customKeywords} setCustomKeywords={setCustomKeywords} savingsGoals={savingsGoals} setSavingsGoals={setSavingsGoals} dbStatus={dbStatus} notify={notify} guessCategory={guessCategory} />}
     </div>
   );
 }
@@ -1261,7 +1447,7 @@ function ColumnMapper({ modal, categories, customKeywords, setTransactions, noti
 
 // ─── Column Mapper Component ─────────────────────────────────────────────────
 // ─── Modal Component ──────────────────────────────────────────────────────────
-function Modal({ modal, setModal, categories, setCategories, bills, setBills, schedule, setSchedule, transactions, setTransactions, customKeywords, setCustomKeywords, dbStatus, notify, guessCategory }) {
+function Modal({ modal, setModal, categories, setCategories, bills, setBills, schedule, setSchedule, transactions, setTransactions, customKeywords, setCustomKeywords, savingsGoals, setSavingsGoals, dbStatus, notify, guessCategory }) {
   const [form, setForm] = useState({});
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const close = () => setModal(null);
@@ -1289,11 +1475,25 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
       setCustomKeywords(prev => [...prev, newKw]);
       if (dbStatus === "connected") sb.upsert("custom_keywords", newKw).catch(() => {});
       notify(`Keyword "${form.keyword}" added!`);
+    } else if (modal.type === "addSavingsGoal") {
+      if (!form.name || !form.targetAmount) return;
+      const newGoal = { id: `sg_${Date.now()}`, name: form.name, targetAmount: parseFloat(form.targetAmount), color: form.color || "#4ADE80", emoji: form.emoji || "🎯", note: form.note || "", manualAmount: 0 };
+      setSavingsGoals(prev => [...prev, newGoal]);
+      notify(`Goal "${form.name}" created!`);
+    } else if (modal.type === "editSavingsGoal") {
+      setSavingsGoals(prev => prev.map(g => g.id === modal.goal.id ? { ...g,
+        name: form.name ?? g.name,
+        targetAmount: form.targetAmount ? parseFloat(form.targetAmount) : g.targetAmount,
+        color: form.color ?? g.color,
+        emoji: form.emoji ?? g.emoji,
+        note: form.note ?? g.note,
+      } : g));
+      notify("Goal updated!");
     }
     close();
   };
 
-  const titles = { addCategory: "Add Category", addBill: "Add Bill", addSchedule: "Schedule Event", addTransaction: "Add Transaction", addKeyword: "Add Keyword Rule", columnMapper: "Match Your CSV Columns", categoryDrilldown: "" };
+  const titles = { addCategory: "Add Category", addBill: "Add Bill", addSchedule: "Schedule Event", addTransaction: "Add Transaction", addKeyword: "Add Keyword Rule", columnMapper: "Match Your CSV Columns", categoryDrilldown: "", addSavingsGoal: "Add Savings Goal", editSavingsGoal: "Edit Savings Goal" };
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && close()}>
@@ -1376,6 +1576,35 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
 
           {modal.type === "columnMapper" && <ColumnMapper modal={modal} categories={categories} customKeywords={customKeywords} setTransactions={setTransactions} notify={notify} close={close} guessCategory={guessCategory} />}
           {modal.type === "categoryDrilldown" && <CategoryDrilldown modal={modal} categories={categories} transactions={transactions} setTransactions={setTransactions} dbStatus={dbStatus} notify={notify} close={close} />}
+
+          {(modal.type === "addSavingsGoal" || modal.type === "editSavingsGoal") && <>
+            <input className="input" placeholder="Goal name (e.g. Emergency Fund)" defaultValue={modal.goal?.name || ""}
+              onChange={e => set("name", e.target.value)} />
+            <input className="input" type="number" placeholder="Target amount ($)" defaultValue={modal.goal?.targetAmount || ""}
+              onChange={e => set("targetAmount", e.target.value)} />
+            <input className="input" placeholder='Note or deadline (e.g. "By Dec 2026")' defaultValue={modal.goal?.note || ""}
+              onChange={e => set("note", e.target.value)} />
+            <div>
+              <div style={{ fontSize: 12, color: T.muted, marginBottom: 6 }}>Pick an emoji</div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {["🎯","🏠","✈️","🚗","🎓","💍","🐣","🛡️","📱","💻","🏖️","🎁","🐾","💪","🌱"].map(em => (
+                  <button key={em} onClick={() => set("emoji", em)}
+                    style={{ fontSize: 20, background: (form.emoji ?? modal.goal?.emoji) === em ? "rgba(78,205,196,0.2)" : "rgba(255,255,255,0.05)", border: `1px solid ${(form.emoji ?? modal.goal?.emoji) === em ? T.teal : T.border}`, borderRadius: 8, padding: "4px 8px", cursor: "pointer" }}>
+                    {em}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: T.muted, marginBottom: 6 }}>Pick a color</div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {["#4ADE80","#67E8F9","#FCD34D","#F472B6","#A78BFA","#FB923C","#60A5FA","#F87171"].map(c => (
+                  <button key={c} onClick={() => set("color", c)}
+                    style={{ width: 28, height: 28, borderRadius: "50%", background: c, border: `3px solid ${(form.color ?? modal.goal?.color) === c ? T.white : "transparent"}`, cursor: "pointer" }} />
+                ))}
+              </div>
+            </div>
+          </>}
         </div>
 
         {modal.type !== "columnMapper" && modal.type !== "categoryDrilldown" && (
