@@ -214,7 +214,6 @@ const guessCategory = (desc = "", cats, customKeywords = []) => {
 const SUPABASE_URL = "https://mlsnwxuyvfzqqextcems.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_Wof2d5MpMxvckU7gNOyP0g_9YhCvf6T";
 
-
 // Lightweight Supabase REST helper (no npm package needed)
 const sb = {
   headers: {
@@ -365,10 +364,15 @@ export default function BudgetApp() {
     { id: "s2", date: "2026-03-01", type: "bill", amount: 1500, note: "Rent due", from: "Checking", to: "Landlord" },
   ]);
   const [customKeywords, setCustomKeywords] = useState([]);
-  const [selectedMonth, setSelectedMonth] = useState(() => {
+  const [dateRange, setDateRange] = useState(() => {
     const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const y = now.getFullYear(), m = now.getMonth();
+    const start = new Date(y, m, 1);
+    const end = new Date(y, m + 1, 0);
+    const fmt = d => d.toISOString().split("T")[0];
+    return { start: fmt(start), end: fmt(end) };
   });
+  const [setupComplete, setSetupComplete] = useState(() => !!localStorage.getItem("smartbudget_setup_done"));
   const [savingsGoals, setSavingsGoals] = useState([
     { id: "sg_emergency", name: "Emergency Fund", targetAmount: 5000, color: "#4ADE80", emoji: "🛡️", note: "3-6 months of expenses" },
     { id: "sg_vacation",  name: "Vacation",       targetAmount: 2000, color: "#67E8F9", emoji: "✈️", note: "Summer 2026" },
@@ -428,6 +432,13 @@ export default function BudgetApp() {
       setLoading(false);
     })();
   }, []);
+
+  // Launch setup wizard on first visit
+  useEffect(() => {
+    if (!loading && !setupComplete) {
+      setModal({ type: "setupWizard" });
+    }
+  }, [loading]);
 
   // Auto-save — mirrors every state change to Supabase or localStorage
   useEffect(() => {
@@ -567,14 +578,21 @@ export default function BudgetApp() {
   }, [categories]);
 
   // ── Computed ─────────────────────────────────────────────────────────────
-  // Filter transactions to selected month for all budget calculations
+  // Filter transactions to selected date range
+  const rangeStart = dateRange.start ? new Date(dateRange.start + "T00:00:00") : null;
+  const rangeEnd   = dateRange.end   ? new Date(dateRange.end   + "T23:59:59") : null;
   const monthTxns = transactions.filter(t => {
     if (!t.date) return false;
-    const d = new Date(t.date);
+    const d = new Date(t.date + (t.date.length === 10 ? "T12:00:00" : ""));
     if (isNaN(d)) return false;
-    const tMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    return tMonth === selectedMonth;
+    if (rangeStart && d < rangeStart) return false;
+    if (rangeEnd   && d > rangeEnd)   return false;
+    return true;
   });
+  const rangeLabelShort = (() => {
+    const fmtD = s => { if (!s) return ""; const [y,m,d] = s.split("-"); return `${m}/${d}/${y.slice(2)}`; };
+    return dateRange.start === dateRange.end ? fmtD(dateRange.start) : `${fmtD(dateRange.start)} – ${fmtD(dateRange.end)}`;
+  })();
 
   const totalIncome = monthTxns.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
   const totalExpense = Math.abs(monthTxns.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0));
@@ -588,17 +606,23 @@ export default function BudgetApp() {
   })).filter(c => c.value > 0);
 
   const monthlyData = (() => {
+    // Always show last 6 months of data for trend charts regardless of date range filter
     const map = {};
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      map[key] = { label: MONTHS[d.getMonth()] + " '" + d.getFullYear().toString().slice(2), income: 0, expenses: 0 };
+    }
     transactions.forEach(t => {
-      const d = new Date(t.date);
+      const d = new Date(t.date + "T12:00:00");
       if (isNaN(d)) return;
       const key = `${d.getFullYear()}-${d.getMonth()}`;
-      const label = MONTHS[d.getMonth()] + " " + d.getFullYear().toString().slice(2);
-      if (!map[key]) map[key] = { label, income: 0, expenses: 0 };
+      if (!map[key]) return; // outside 6-month window
       if (t.amount > 0) map[key].income += t.amount;
       else map[key].expenses += Math.abs(t.amount);
     });
-    return Object.values(map).slice(-6);
+    return Object.values(map);
   })();
 
   const savingsLine = (() => {
@@ -654,29 +678,39 @@ export default function BudgetApp() {
             {n.label}
           </button>
         ))}
-        {/* Month Selector */}
+        {/* Date Range Picker */}
         <div style={{ padding: "14px 8px", borderTop: `1px solid ${T.border}`, marginTop: 8 }}>
-          <div style={{ fontSize: 11, color: T.muted, marginBottom: 6 }}>Viewing Month</div>
-          <select
-            className="input"
-            style={{ fontSize: 13, padding: "7px 10px", width: "100%" }}
-            value={selectedMonth}
-            onChange={e => setSelectedMonth(e.target.value)}>
-            {(() => {
-              const opts = [];
-              const now = new Date();
-              for (let i = 0; i < 12; i++) {
-                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-                const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-                const label = d.toLocaleString("default", { month: "long", year: "numeric" });
-                opts.push(<option key={val} value={val}>{label}</option>);
-              }
-              return opts;
-            })()}
-          </select>
+          <div style={{ fontSize: 11, color: T.muted, marginBottom: 6 }}>Date Range</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            <input type="date" className="input" style={{ fontSize: 12, padding: "6px 8px" }}
+              value={dateRange.start}
+              onChange={e => setDateRange(r => ({ ...r, start: e.target.value }))} />
+            <div style={{ fontSize: 10, color: T.muted, textAlign: "center" }}>to</div>
+            <input type="date" className="input" style={{ fontSize: 12, padding: "6px 8px" }}
+              value={dateRange.end}
+              onChange={e => setDateRange(r => ({ ...r, end: e.target.value }))} />
+          </div>
+          {/* Quick presets */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 8 }}>
+            {[
+              { label: "This Month", fn: () => { const n=new Date(),y=n.getFullYear(),m=n.getMonth(),fmt=d=>d.toISOString().split("T")[0]; setDateRange({ start: fmt(new Date(y,m,1)), end: fmt(new Date(y,m+1,0)) }); } },
+              { label: "Last Month", fn: () => { const n=new Date(),y=n.getFullYear(),m=n.getMonth()-1,fmt=d=>d.toISOString().split("T")[0]; setDateRange({ start: fmt(new Date(y,m,1)), end: fmt(new Date(y,m+1,0)) }); } },
+              { label: "Last 3 Mo",  fn: () => { const n=new Date(),fmt=d=>d.toISOString().split("T")[0]; setDateRange({ start: fmt(new Date(n.getFullYear(),n.getMonth()-2,1)), end: fmt(new Date(n.getFullYear(),n.getMonth()+1,0)) }); } },
+              { label: "This Year",  fn: () => { const y=new Date().getFullYear(),fmt=d=>d.toISOString().split("T")[0]; setDateRange({ start: fmt(new Date(y,0,1)), end: fmt(new Date(y,11,31)) }); } },
+            ].map(p => (
+              <button key={p.label} onClick={p.fn}
+                style={{ fontSize: 10, padding: "3px 7px", borderRadius: 6, background: "rgba(78,205,196,0.1)", border: `1px solid rgba(78,205,196,0.2)`, color: T.teal, cursor: "pointer", fontFamily: "DM Sans" }}>
+                {p.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div style={{ padding: "16px 8px 0", borderTop: `1px solid ${T.border}` }}>
+          <button className="btn btn-ghost" style={{ width: "100%", fontSize: 12, marginBottom: 12, justifyContent: "center" }}
+            onClick={() => setModal({ type: "setupWizard" })}>
+            ⚙️ Budget Setup
+          </button>
           <div style={{ fontSize: 11, color: T.muted }}>Storage</div>
           <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
             {dbStatus === "connected" && <>
@@ -710,7 +744,7 @@ export default function BudgetApp() {
           <div className="fade-in">
             <h1 style={{ fontFamily: "Syne", fontSize: 26, fontWeight: 700, marginBottom: 4 }}>Overview</h1>
             <p style={{ color: T.muted, fontSize: 14, marginBottom: 24 }}>
-              {transactions.length === 0 ? "Upload your bank transactions to get started →" : `Showing ${monthTxns.length} transactions for ${new Date(selectedMonth + "-02").toLocaleString("default", { month: "long", year: "numeric" })}`}
+              {transactions.length === 0 ? "Upload your bank transactions to get started →" : `Showing ${monthTxns.length} transactions · ${rangeLabelShort}`}
             </p>
 
             {/* Stat cards */}
@@ -905,7 +939,7 @@ export default function BudgetApp() {
                 const txnCount = catMonthTxns.length;
                 return (
                   <div key={cat.id} className="card" style={{ position: "relative", cursor: txnCount > 0 ? "pointer" : "default", transition: "border-color 0.2s", borderColor: T.border }}
-                    onClick={() => txnCount > 0 && setModal({ type: "categoryDrilldown", cat, selectedMonth })}
+                    onClick={() => txnCount > 0 && setModal({ type: "categoryDrilldown", cat, dateRange })}
                     onMouseEnter={e => { if (txnCount > 0) e.currentTarget.style.borderColor = cat.color; }}
                     onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -1029,6 +1063,7 @@ export default function BudgetApp() {
           const savCatIds = categories.filter(c => c.type === "savings").map(c => c.id);
           const savTxns = transactions.filter(t => savCatIds.includes(t.categoryId));
           const totalSaved = savTxns.reduce((s, t) => s + Math.abs(t.amount), 0);
+          const totalManual = savingsGoals.reduce((s, g) => s + (g.manualAmount || 0), 0);
           const totalGoalTarget = savingsGoals.reduce((s, g) => s + (g.targetAmount || 0), 0);
           const overallPct = totalGoalTarget > 0 ? Math.min((totalSaved / totalGoalTarget) * 100, 100) : 0;
 
@@ -1071,12 +1106,9 @@ export default function BudgetApp() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
                 {savingsGoals.map(goal => {
                   // Saved amount = transactions in categories matching this goal's linkedCategoryId, or all savings if unlinked
-                  const linked = goal.linkedCategoryId
-                    ? transactions.filter(t => t.categoryId === goal.linkedCategoryId)
-                    : [];
-                  const goalSaved = goal.linkedCategoryId
-                    ? linked.reduce((s, t) => s + Math.abs(t.amount), 0)
-                    : 0;
+                  // Sum all savings transactions assigned to this goal via dropdown
+                  const assignedTxns = transactions.filter(t => t.goalId === goal.id);
+                  const goalSaved = assignedTxns.reduce((s, t) => s + Math.abs(t.amount), 0);
                   const manualSaved = goal.manualAmount || 0;
                   const totalGoalSaved = goalSaved + manualSaved;
                   const pct = goal.targetAmount > 0 ? Math.min((totalGoalSaved / goal.targetAmount) * 100, 100) : 0;
@@ -1173,19 +1205,29 @@ export default function BudgetApp() {
                           <tr>
                             <th>Date</th>
                             <th>Description</th>
-                            <th>Category</th>
+                            <th>Savings Goal</th>
                             <th style={{ textAlign: "right" }}>Amount</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {savTxns.slice(0, 20).map(t => {
+                          {savTxns.slice(0, 50).map(t => {
                             const cat = categories.find(c => c.id === t.categoryId);
                             return (
                               <tr key={t.id}>
-                                <td style={{ color: T.muted, fontSize: 12 }}>{t.date}</td>
-                                <td style={{ fontSize: 13, fontWeight: 500 }}>{t.description}</td>
-                                <td><CategoryBadge category={cat} /></td>
-                                <td style={{ textAlign: "right", fontWeight: 600, color: "#4ADE80" }}>+{fmt(Math.abs(t.amount))}</td>
+                                <td style={{ color: T.muted, fontSize: 12, whiteSpace: "nowrap" }}>{t.date}</td>
+                                <td style={{ fontSize: 13, fontWeight: 500, maxWidth: 260 }}>
+                                  <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={t.description}>{t.description}</div>
+                                </td>
+                                <td>
+                                  <select
+                                    style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${T.border}`, borderRadius: 8, padding: "4px 8px", color: T.text, fontSize: 12, outline: "none", cursor: "pointer", minWidth: 130 }}
+                                    value={t.goalId || ""}
+                                    onChange={e => setTransactions(prev => prev.map(x => x.id === t.id ? { ...x, goalId: e.target.value || null } : x))}>
+                                    <option value="">— Unassigned —</option>
+                                    {savingsGoals.map(g => <option key={g.id} value={g.id} style={{ background: T.card }}>{g.emoji} {g.name}</option>)}
+                                  </select>
+                                </td>
+                                <td style={{ textAlign: "right", fontWeight: 600, color: "#4ADE80", whiteSpace: "nowrap" }}>+{fmt(Math.abs(t.amount))}</td>
                               </tr>
                             );
                           })}
@@ -1294,21 +1336,25 @@ function CategoryDrilldown({ modal, categories, transactions, setTransactions, d
   const { cat } = modal;
   const [search, setSearch] = useState("");
 
-  const selectedMonth = modal.selectedMonth;
+  const { dateRange } = modal;
+  const rStart = dateRange?.start ? new Date(dateRange.start + "T00:00:00") : null;
+  const rEnd   = dateRange?.end   ? new Date(dateRange.end   + "T23:59:59") : null;
   const catTxns = transactions
     .filter(t => t.categoryId === cat.id)
     .filter(t => {
-      if (!selectedMonth || !t.date) return true;
-      const d = new Date(t.date);
+      if (!t.date) return true;
+      const d = new Date(t.date + "T12:00:00");
       if (isNaN(d)) return true;
-      const tMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      return tMonth === selectedMonth;
+      if (rStart && d < rStart) return false;
+      if (rEnd   && d > rEnd)   return false;
+      return true;
     })
     .filter(t => search === "" || t.description.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => new Date(b.date) - new Date(a.date));
 
   const total = catTxns.reduce((s, t) => s + t.amount, 0);
-  const monthLabel = selectedMonth ? new Date(selectedMonth + "-02").toLocaleString("default", { month: "long", year: "numeric" }) : "All Time";
+  const fmtD = s => { if (!s) return ""; const [y,m,d] = s.split("-"); return `${m}/${d}/${y.slice(2)}`; };
+  const monthLabel = dateRange?.start ? `${fmtD(dateRange.start)}–${fmtD(dateRange.end)}` : "All Time";
   const fmt = (n) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(n || 0);
 
   const recat = (txnId, newCatId) => {
@@ -1390,6 +1436,175 @@ function CategoryDrilldown({ modal, categories, transactions, setTransactions, d
 
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <button className="btn btn-primary" onClick={close}>Done</button>
+      </div>
+    </div>
+  );
+}
+
+
+// ─── Setup Wizard Component ───────────────────────────────────────────────────
+const WIZARD_STEPS = [
+  { id: "welcome",    title: "Welcome to $martBudget!",     subtitle: "Let's set up your budget in about 2 minutes." },
+  { id: "housing",   title: "Housing",                      subtitle: "What is your monthly rent or mortgage payment?" },
+  { id: "transport", title: "Car & Transportation",         subtitle: "Set your monthly car-related budgets." },
+  { id: "insurance", title: "Insurance",                    subtitle: "Enter your monthly insurance costs." },
+  { id: "utilities", title: "Utilities & Bills",            subtitle: "What do you typically pay each month?" },
+  { id: "food",      title: "Food & Groceries",             subtitle: "Set your monthly food budgets." },
+  { id: "income",    title: "Income Keyword",               subtitle: "What word appears in your paycheck on your bank statement?" },
+  { id: "done",      title: "You're all set! 🎉",           subtitle: "Your budgets have been saved." },
+];
+
+function SetupWizard({ categories, setCategories, setCustomKeywords, onComplete }) {
+  const [step, setStep] = useState(0);
+  const [vals, setVals] = useState({
+    rent: "", car_payment: "", gasoline: "", car_insurance: "",
+    health_ins: "", dental: "", electricity: "", wifi: "", phone: "",
+    food: "", grocery: "", income_keyword: "direct deposit",
+  });
+
+  const set = (k, v) => setVals(prev => ({ ...prev, [k]: v }));
+  const pct = Math.round((step / (WIZARD_STEPS.length - 1)) * 100);
+
+  const applyAndFinish = () => {
+    // Update category budgets
+    const budgetMap = {
+      housing:     parseFloat(vals.rent)           || 0,
+      car_payment: parseFloat(vals.car_payment)    || 0,
+      gasoline:    parseFloat(vals.gasoline)       || 0,
+      health_ins:  parseFloat(vals.health_ins)     || 0,
+      dental:      parseFloat(vals.dental)         || 0,
+      electricity: parseFloat(vals.electricity)    || 0,
+      wifi:        parseFloat(vals.wifi)           || 0,
+      phone:       parseFloat(vals.phone)          || 0,
+      food:        parseFloat(vals.food)           || 0,
+      grocery:     parseFloat(vals.grocery)        || 0,
+    };
+    setCategories(prev => prev.map(c =>
+      budgetMap[c.id] !== undefined && budgetMap[c.id] > 0
+        ? { ...c, budget: budgetMap[c.id] }
+        : c
+    ));
+    // Add custom income keyword if provided
+    if (vals.income_keyword.trim()) {
+      setCustomKeywords(prev => {
+        const kw = vals.income_keyword.toLowerCase().trim();
+        if (prev.some(k => k.keyword === kw)) return prev;
+        return [...prev, { id: `kw_inc_${Date.now()}`, keyword: kw, categoryId: "income" }];
+      });
+    }
+    // Car insurance — add as custom keyword rule + category if not exists
+    if (vals.car_insurance && parseFloat(vals.car_insurance) > 0) {
+      setCategories(prev => {
+        if (prev.some(c => c.id === "car_insurance")) {
+          return prev.map(c => c.id === "car_insurance" ? { ...c, budget: parseFloat(vals.car_insurance) } : c);
+        }
+        return [...prev, { id: "car_insurance", name: "Car Insurance", color: "#FBBF24", budget: parseFloat(vals.car_insurance), type: "expense" }];
+      });
+    }
+    onComplete();
+  };
+
+  const next = () => { if (step < WIZARD_STEPS.length - 1) setStep(s => s + 1); else applyAndFinish(); };
+  const back = () => setStep(s => Math.max(0, s - 1));
+
+  const s = WIZARD_STEPS[step];
+
+  const Field = ({ label, field, placeholder = "0.00", prefix = "$" }) => (
+    <div>
+      <div style={{ fontSize: 13, color: T.muted, marginBottom: 5 }}>{label}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
+        <span style={{ padding: "9px 10px", background: "rgba(255,255,255,0.04)", border: `1px solid ${T.border}`, borderRight: "none", borderRadius: "10px 0 0 10px", fontSize: 14, color: T.muted }}>{prefix}</span>
+        <input type="number" className="input" placeholder={placeholder}
+          value={vals[field]}
+          onChange={e => set(field, e.target.value)}
+          style={{ borderRadius: "0 10px 10px 0", borderLeft: "none" }} />
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+      {/* Progress bar */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+          <span style={{ fontSize: 11, color: T.muted }}>Step {step + 1} of {WIZARD_STEPS.length}</span>
+          <span style={{ fontSize: 11, color: T.teal }}>{pct}% complete</span>
+        </div>
+        <div className="progress-bar" style={{ height: 6 }}>
+          <div className="progress-fill" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${T.teal}, #A78BFA)`, transition: "width 0.4s ease" }} />
+        </div>
+      </div>
+
+      {/* Step subtitle */}
+      <div style={{ fontSize: 13, color: T.muted, marginBottom: 20, lineHeight: 1.5 }}>{s.subtitle}</div>
+
+      {/* Step content */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 14, minHeight: 160 }}>
+        {step === 0 && (
+          <div style={{ textAlign: "center", padding: "20px 0" }}>
+            <div style={{ fontSize: 64, marginBottom: 16 }}>💰</div>
+            <div style={{ color: T.muted, fontSize: 14, lineHeight: 1.7 }}>
+              We'll walk you through setting your monthly budgets<br/>for the most common expense categories.<br/><br/>
+              <span style={{ color: T.teal }}>You can always change these later</span> in the Categories tab.
+            </div>
+          </div>
+        )}
+        {step === 1 && <Field label="Monthly Rent or Mortgage" field="rent" />}
+        {step === 2 && <>
+          <Field label="Monthly Car Payment" field="car_payment" />
+          <Field label="Monthly Gas Budget" field="gasoline" />
+        </>}
+        {step === 3 && <>
+          <Field label="Monthly Health Insurance" field="health_ins" />
+          <Field label="Monthly Dental Insurance" field="dental" />
+          <Field label="Monthly Car Insurance" field="car_insurance" />
+        </>}
+        {step === 4 && <>
+          <Field label="Monthly Electricity Bill" field="electricity" />
+          <Field label="Monthly Wi-Fi / Internet" field="wifi" />
+          <Field label="Monthly Phone Bill" field="phone" />
+        </>}
+        {step === 5 && <>
+          <Field label="Monthly Food & Dining Budget" field="food" />
+          <Field label="Monthly Grocery Budget" field="grocery" />
+        </>}
+        {step === 6 && (
+          <div>
+            <div style={{ fontSize: 13, color: T.muted, marginBottom: 8, lineHeight: 1.5 }}>
+              Type a word or phrase that always appears in your paycheck transactions.<br/>
+              For example: <span style={{ color: T.teal }}>"direct deposit"</span>, your employer name, or <span style={{ color: T.teal }}>"payroll"</span>.
+            </div>
+            <input className="input" placeholder='e.g. "direct deposit" or your employer name'
+              value={vals.income_keyword}
+              onChange={e => set("income_keyword", e.target.value)} />
+          </div>
+        )}
+        {step === WIZARD_STEPS.length - 1 && (
+          <div style={{ textAlign: "center", padding: "20px 0" }}>
+            <div style={{ fontSize: 64, marginBottom: 16 }}>🎯</div>
+            <div style={{ color: T.muted, fontSize: 14, lineHeight: 1.7 }}>
+              Your budgets are saved. Upload a bank statement in the<br/><strong style={{ color: T.text }}>Transactions</strong> tab to see everything in action.<br/><br/>
+              You can re-run this wizard anytime via<br/><span style={{ color: T.teal }}>⚙️ Budget Setup</span> in the sidebar.
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Nav buttons */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 24 }}>
+        <div>
+          {step > 0 && step < WIZARD_STEPS.length - 1 && (
+            <button className="btn btn-ghost" onClick={back}>← Back</button>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          {step < WIZARD_STEPS.length - 1 && (
+            <button className="btn btn-ghost" onClick={onComplete}>Skip setup</button>
+          )}
+          <button className="btn btn-primary" onClick={next}>
+            {step === WIZARD_STEPS.length - 2 ? "Finish →" : step === WIZARD_STEPS.length - 1 ? "Get Started!" : "Next →"}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1538,11 +1753,11 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
     close();
   };
 
-  const titles = { addCategory: "Add Category", addBill: "Add Bill", addSchedule: "Schedule Event", addTransaction: "Add Transaction", addKeyword: "Add Keyword Rule", columnMapper: "Match Your CSV Columns", categoryDrilldown: "", addSavingsGoal: "Add Savings Goal", editSavingsGoal: "Edit Savings Goal" };
+  const titles = { addCategory: "Add Category", addBill: "Add Bill", addSchedule: "Schedule Event", addTransaction: "Add Transaction", addKeyword: "Add Keyword Rule", columnMapper: "Match Your CSV Columns", categoryDrilldown: "", addSavingsGoal: "Add Savings Goal", editSavingsGoal: "Edit Savings Goal", setupWizard: "" };
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && close()}>
-      <div className={`modal ${modal.type === "categoryDrilldown" ? "wide" : ""}`}>
+      <div className={`modal ${(modal.type === "categoryDrilldown" || modal.type === "setupWizard") ? "wide" : ""}`}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <div style={{ fontFamily: "Syne", fontSize: 18, fontWeight: 700 }}>
             {modal.type === "categoryDrilldown" ? (
@@ -1621,6 +1836,9 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
 
           {modal.type === "columnMapper" && <ColumnMapper modal={modal} categories={categories} customKeywords={customKeywords} setTransactions={setTransactions} notify={notify} close={close} guessCategory={guessCategory} />}
           {modal.type === "categoryDrilldown" && <CategoryDrilldown modal={modal} categories={categories} transactions={transactions} setTransactions={setTransactions} dbStatus={dbStatus} notify={notify} close={close} />}
+          {modal.type === "setupWizard" && <SetupWizard categories={categories} setCategories={setCategories} setCustomKeywords={setCustomKeywords} onComplete={() => { localStorage.setItem("smartbudget_setup_done","1"); setSetupComplete(true); close(); notify("Setup complete! 🎉"); }} />}
+          {modal.type === "setupWizard" && <SetupWizard categories={categories} setCategories={setCategories} setCustomKeywords={setCustomKeywords} onComplete={() => { localStorage.setItem("smartbudget_setup_done","1"); setSetupComplete(true); close(); notify("Setup complete! 🎉"); }} />}
+          {modal.type === "setupWizard" && <SetupWizard categories={categories} setCategories={setCategories} setCustomKeywords={setCustomKeywords} onComplete={() => { localStorage.setItem("smartbudget_setup_done","1"); setSetupComplete(true); close(); notify("Setup complete! 🎉"); }} />}
 
           {(modal.type === "addSavingsGoal" || modal.type === "editSavingsGoal") && <>
             <input className="input" placeholder="Goal name (e.g. Emergency Fund)" defaultValue={modal.goal?.name || ""}
@@ -1652,7 +1870,7 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
           </>}
         </div>
 
-        {modal.type !== "columnMapper" && modal.type !== "categoryDrilldown" && (
+        {modal.type !== "columnMapper" && modal.type !== "categoryDrilldown" && modal.type !== "setupWizard" && (
           <div style={{ display: "flex", gap: 8, marginTop: 20, justifyContent: "flex-end" }}>
             <button className="btn btn-ghost" onClick={close}>Cancel</button>
             <button className="btn btn-primary" onClick={submit}>Save</button>
