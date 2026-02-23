@@ -32,154 +32,167 @@ const T = {
 const CATEGORY_COLORS = [T.coral, T.teal, T.yellow, T.purple, T.green, T.blue, "#FB923C", "#F472B6", "#34D399", "#FCD34D"];
 
 const DEFAULT_CATEGORIES = [
-  // ── Income & Savings ──
-  { id: "income",        name: "Income",           color: T.green,   budget: 0,    type: "income"   },
-  { id: "savings",       name: "Savings",           color: "#FCD34D", budget: 500,  type: "savings"  },
-  { id: "marcus",        name: "Marcus",            color: "#FCD34D", budget: 0,    type: "savings"  },
-  // ── Housing ──
-  { id: "housing",       name: "Rent",              color: T.coral,   budget: 1500, type: "expense"  },
-  // ── Food ──
-  { id: "food",          name: "Food & Dining",     color: T.teal,    budget: 600,  type: "expense"  },
-  { id: "grocery",       name: "Grocery",           color: "#34D399", budget: 400,  type: "expense"  },
-  // ── Transport ──
-  { id: "transport",     name: "Transportation",    color: T.yellow,  budget: 200,  type: "expense"  },
-  { id: "gasoline",      name: "Gasoline",          color: "#FB923C", budget: 150,  type: "expense"  },
-  // ── Utilities ──
-  { id: "electricity",   name: "Electricity",       color: "#60A5FA", budget: 150,  type: "expense"  },
-  { id: "wifi",          name: "Wi-Fi",             color: "#818CF8", budget: 80,   type: "expense"  },
-  { id: "phone",         name: "Phone",             color: "#A78BFA", budget: 80,   type: "expense"  },
-  // ── Health ──
-  { id: "health_ins",    name: "Health Insurance",  color: T.green,   budget: 300,  type: "expense"  },
-  { id: "dental",        name: "Dental",            color: "#6EE7B7", budget: 100,  type: "expense"  },
-  { id: "medical",       name: "Medical Bills",     color: "#F87171", budget: 200,  type: "expense"  },
-  // ── Credit Cards / Loans ──
-  { id: "car_payment",   name: "Car Payment",       color: "#FBBF24", budget: 400,  type: "expense"  },
-  { id: "apple_card",    name: "Apple Card",        color: "#E5E7EB", budget: 200,  type: "expense"  },
-  { id: "citi_card",     name: "CITI Card",         color: "#3B82F6", budget: 200,  type: "expense"  },
-  { id: "care_credit",   name: "Care Credit",       color: "#EC4899", budget: 100,  type: "expense"  },
-  { id: "wells_fargo",   name: "Wells Fargo Card",  color: "#EF4444", budget: 200,  type: "expense"  },
-  { id: "amoco_loan",    name: "AMOCO Loan",        color: "#F59E0B", budget: 0,    type: "expense"  },
-  { id: "jgw",           name: "JG Wentworth",      color: "#D97706", budget: 0,    type: "expense"  },
-  // ── Lifestyle ──
-  { id: "fitness",       name: "Fitness",           color: "#4ADE80", budget: 60,   type: "expense"  },
-  { id: "self_care",     name: "Self Care",         color: "#F472B6", budget: 100,  type: "expense"  },
-  { id: "dogs",          name: "Dogs",              color: "#A3E635", budget: 100,  type: "expense"  },
-  { id: "baby",          name: "Baby",              color: "#FDE68A", budget: 150,  type: "expense"  },
-  { id: "contribution",  name: "Contribution",      color: "#C4B5FD", budget: 100,  type: "expense"  },
-  { id: "subscriptions", name: "Subscriptions",     color: T.purple,  budget: 100,  type: "expense"  },
-  { id: "entertainment", name: "Entertainment",     color: "#F472B6", budget: 100,  type: "expense"  },
-  // ── Travel & Misc ──
-  { id: "travel",        name: "Travel",            color: "#67E8F9", budget: 200,  type: "expense"  },
-  { id: "shopping",      name: "Shopping / Misc",   color: "#FB923C", budget: 200,  type: "expense"  },
-  { id: "work",          name: "Work",              color: "#94A3B8", budget: 0,    type: "expense"  },
-  { id: "other",         name: "Other",             color: T.muted,   budget: 100,  type: "expense"  },
+  // ── Income & Savings ──────────────────────────────────────────
+  { id: "income",       name: "Income",          color: "#6BCB77", budget: 0,    type: "income"   },
+  { id: "savings",      name: "Savings",          color: "#FCD34D", budget: 500,  type: "savings"  },
+  // ── Housing ───────────────────────────────────────────────────
+  { id: "housing",      name: "Rent",             color: "#A78BFA", budget: 1500, type: "expense"  },
+  // ── Food ──────────────────────────────────────────────────────
+  { id: "food",         name: "Food & Dining",    color: "#4ECDC4", budget: 600,  type: "expense"  },
+  { id: "grocery",      name: "Grocery",          color: "#34D399", budget: 400,  type: "expense"  },
+  // ── Transport ─────────────────────────────────────────────────
+  { id: "transport",    name: "Transportation",   color: "#FFE66D", budget: 300,  type: "expense"  },
+  // ── Utilities ─────────────────────────────────────────────────
+  { id: "utilities",    name: "Utilities",        color: "#60A5FA", budget: 250,  type: "expense"  },
+  // ── Health ────────────────────────────────────────────────────
+  { id: "health_ins",   name: "Health Insurance", color: "#6BCB77", budget: 300,  type: "expense"  },
+  { id: "healthcare",   name: "Healthcare",       color: "#F87171", budget: 200,  type: "expense"  },
+  // ── Debt & Credit ─────────────────────────────────────────────
+  { id: "credit_cards", name: "Credit Cards",     color: "#3B82F6", budget: 400,  type: "expense"  },
+  { id: "loans_debt",   name: "Loans & Debt",     color: "#F59E0B", budget: 500,  type: "expense"  },
+  // ── Lifestyle ─────────────────────────────────────────────────
+  { id: "personal_care",name: "Personal Care",    color: "#F472B6", budget: 150,  type: "expense"  },
+  { id: "entertainment",name: "Entertainment",    color: "#A78BFA", budget: 150,  type: "expense"  },
+  { id: "baby",         name: "Baby",             color: "#FDE68A", budget: 150,  type: "expense"  },
+  { id: "pets",         name: "Pets",             color: "#A3E635", budget: 100,  type: "expense"  },
+  { id: "contribution", name: "Contribution",     color: "#C4B5FD", budget: 100,  type: "expense"  },
+  { id: "notary",       name: "Notary",           color: "#94A3B8", budget: 0,    type: "expense"  },
+  // ── Travel & Misc ─────────────────────────────────────────────
+  { id: "travel",       name: "Travel",           color: "#67E8F9", budget: 200,  type: "expense"  },
+  { id: "shopping",     name: "Shopping / Misc",  color: "#FB923C", budget: 200,  type: "expense"  },
+  { id: "work",         name: "Work",             color: "#94A3B8", budget: 0,    type: "expense"  },
+  { id: "other",        name: "Other",            color: "#8B86B0", budget: 100,  type: "expense"  },
 ];
 
 // ── Default keyword → category mappings (Rachel's custom list) ────────────────
 const DEFAULT_KEYWORDS = [
   // Income
-  { id: "kw_payroll",    keyword: "payroll",          categoryId: "income"       },
-  { id: "kw_salary",     keyword: "salary",           categoryId: "income"       },
-  { id: "kw_ddep",       keyword: "direct deposit",   categoryId: "income"       },
-  { id: "kw_zelle",      keyword: "zelle",            categoryId: "income"       },
+  { id: "kw_payroll",    keyword: "payroll",           categoryId: "income"        },
+  { id: "kw_salary",     keyword: "salary",            categoryId: "income"        },
+  { id: "kw_ddep",       keyword: "direct deposit",    categoryId: "income"        },
+  { id: "kw_zelle",      keyword: "zelle",             categoryId: "income"        },
   // Savings
-  { id: "kw_acorns",     keyword: "acorns",           categoryId: "savings"      },
-  { id: "kw_marcus1",    keyword: "marcus",           categoryId: "marcus"       },
-  { id: "kw_transfer",   keyword: "transfer",         categoryId: "savings"      },
+  { id: "kw_acorns",     keyword: "acorns",            categoryId: "savings"       },
+  { id: "kw_marcus1",    keyword: "marcus",            categoryId: "savings"       },
+  { id: "kw_goldman",    keyword: "goldman",           categoryId: "savings"       },
   // Rent
-  { id: "kw_rent",       keyword: "apts lewis",       categoryId: "housing"      },
-  { id: "kw_rent2",      keyword: "rent",             categoryId: "housing"      },
-  { id: "kw_mortgage",   keyword: "mortgage",         categoryId: "housing"      },
+  { id: "kw_rent",       keyword: "apts lewis",        categoryId: "housing"       },
+  { id: "kw_rent2",      keyword: "rent",              categoryId: "housing"       },
+  { id: "kw_mortgage",   keyword: "mortgage",          categoryId: "housing"       },
   // Food
-  { id: "kw_chickfila",  keyword: "chick-fil-a",      categoryId: "food"         },
-  { id: "kw_dq",         keyword: "dairy queen",      categoryId: "food"         },
-  { id: "kw_doordash",   keyword: "doordash",         categoryId: "food"         },
-  { id: "kw_mcdonalds",  keyword: "mcdonald",         categoryId: "food"         },
-  { id: "kw_shipley",    keyword: "shipley",          categoryId: "food"         },
-  { id: "kw_starbucks",  keyword: "starbucks",        categoryId: "food"         },
-  { id: "kw_wingstop",   keyword: "wingstop",         categoryId: "food"         },
-  { id: "kw_restaurant", keyword: "restaurant",       categoryId: "food"         },
-  { id: "kw_ubereats",   keyword: "uber eats",        categoryId: "food"         },
-  { id: "kw_grubhub",    keyword: "grubhub",          categoryId: "food"         },
+  { id: "kw_chickfila",  keyword: "chick-fil-a",       categoryId: "food"          },
+  { id: "kw_dq",         keyword: "dairy queen",       categoryId: "food"          },
+  { id: "kw_doordash",   keyword: "doordash",          categoryId: "food"          },
+  { id: "kw_mcdonalds",  keyword: "mcdonald",          categoryId: "food"          },
+  { id: "kw_shipley",    keyword: "shipley",           categoryId: "food"          },
+  { id: "kw_starbucks",  keyword: "starbucks",         categoryId: "food"          },
+  { id: "kw_wingstop",   keyword: "wingstop",          categoryId: "food"          },
+  { id: "kw_restaurant", keyword: "restaurant",        categoryId: "food"          },
+  { id: "kw_ubereats",   keyword: "uber eats",         categoryId: "food"          },
+  { id: "kw_grubhub",    keyword: "grubhub",           categoryId: "food"          },
   // Grocery
-  { id: "kw_heb",        keyword: "h-e-b",            categoryId: "grocery"      },
-  { id: "kw_kroger",     keyword: "kroger",           categoryId: "grocery"      },
-  { id: "kw_walmart",    keyword: "wal-mart",         categoryId: "grocery"      },
-  { id: "kw_walmart2",   keyword: "walmart",          categoryId: "grocery"      },
-  { id: "kw_aldi",       keyword: "aldi",             categoryId: "grocery"      },
-  // Gasoline
-  { id: "kw_chevron",    keyword: "chevron",          categoryId: "gasoline"     },
-  { id: "kw_fuel",       keyword: "fuel",             categoryId: "gasoline"     },
-  { id: "kw_shell",      keyword: "shell",            categoryId: "gasoline"     },
-  { id: "kw_exxon",      keyword: "exxon",            categoryId: "gasoline"     },
-  // Gas utility
-  { id: "kw_cpenergy",   keyword: "cpenergy",         categoryId: "electricity"  },
-  { id: "kw_reliant",    keyword: "reliant",          categoryId: "electricity"  },
-  // Wi-Fi
-  { id: "kw_comcast",    keyword: "comcast",          categoryId: "wifi"         },
-  // Phone
-  { id: "kw_mobile",     keyword: "mobile",           categoryId: "phone"        },
-  { id: "kw_tmobile",    keyword: "t-mobile",         categoryId: "phone"        },
-  { id: "kw_att",        keyword: "at&t",             categoryId: "phone"        },
-  // Health Insurance
-  { id: "kw_aetna",      keyword: "aetna",            categoryId: "health_ins"   },
-  { id: "kw_ambetter",   keyword: "ambetter",         categoryId: "health_ins"   },
-  { id: "kw_guardian",   keyword: "guardian",         categoryId: "health_ins"   },
-  // Dental
-  { id: "kw_dental",     keyword: "dental",           categoryId: "dental"       },
-  // Medical
-  { id: "kw_napaa",      keyword: "napaanesth",       categoryId: "medical"      },
-  { id: "kw_peds_uro",   keyword: "pediatric urology",categoryId: "medical"      },
-  { id: "kw_serene",     keyword: "serene",           categoryId: "medical"      },
-  { id: "kw_kelsey",     keyword: "kelsey",           categoryId: "medical"      },
-  { id: "kw_memorial",   keyword: "memorial herma",   categoryId: "medical"      },
-  // Credit Cards / Loans
-  { id: "kw_wf_pay",     keyword: "wf payment",       categoryId: "car_payment"  },
-  { id: "kw_apple",      keyword: "applecard",        categoryId: "apple_card"   },
-  { id: "kw_citi",       keyword: "citi",             categoryId: "citi_card"    },
-  { id: "kw_sync",       keyword: "synchrony bank",   categoryId: "care_credit"  },
-  { id: "kw_wf_cred",    keyword: "wf credit",        categoryId: "wells_fargo"  },
-  { id: "kw_amoco",      keyword: "amoco",            categoryId: "amoco_loan"   },
-  { id: "kw_jgw",        keyword: "jgw",              categoryId: "jgw"          },
-  { id: "kw_goldman",    keyword: "goldman",          categoryId: "marcus"       },
-  // Fitness
-  { id: "kw_fitness",    keyword: "fitness",          categoryId: "fitness"      },
-  // Self Care
-  { id: "kw_sally",      keyword: "sally",            categoryId: "self_care"    },
-  // Dogs
-  { id: "kw_rainwalk",   keyword: "rainwalk",         categoryId: "dogs"         },
-  { id: "kw_petco",      keyword: "petco",            categoryId: "dogs"         },
-  { id: "kw_petsmart",   keyword: "petsmart",         categoryId: "dogs"         },
+  { id: "kw_heb",        keyword: "h-e-b",             categoryId: "grocery"       },
+  { id: "kw_kroger",     keyword: "kroger",            categoryId: "grocery"       },
+  { id: "kw_walmart",    keyword: "wal-mart",          categoryId: "grocery"       },
+  { id: "kw_walmart2",   keyword: "walmart",           categoryId: "grocery"       },
+  { id: "kw_aldi",       keyword: "aldi",              categoryId: "grocery"       },
+  // Transportation (gas + transit combined)
+  { id: "kw_chevron",    keyword: "chevron",           categoryId: "transport"     },
+  { id: "kw_fuel",       keyword: "fuel",              categoryId: "transport"     },
+  { id: "kw_shell",      keyword: "shell",             categoryId: "transport"     },
+  { id: "kw_exxon",      keyword: "exxon",             categoryId: "transport"     },
+  { id: "kw_hctra",      keyword: "hctra",             categoryId: "transport"     },
+  { id: "kw_parking",    keyword: "parking",           categoryId: "transport"     },
+  { id: "kw_uber",       keyword: "uber",              categoryId: "transport"     },
+  { id: "kw_lyft",       keyword: "lyft",              categoryId: "transport"     },
+  // Utilities (phone + wifi + electric combined)
+  { id: "kw_cpenergy",   keyword: "cpenergy",          categoryId: "utilities"     },
+  { id: "kw_reliant",    keyword: "reliant",           categoryId: "utilities"     },
+  { id: "kw_comcast",    keyword: "comcast",           categoryId: "utilities"     },
+  { id: "kw_mobile",     keyword: "mobile",            categoryId: "utilities"     },
+  { id: "kw_tmobile",    keyword: "t-mobile",          categoryId: "utilities"     },
+  { id: "kw_att",        keyword: "at&t",              categoryId: "utilities"     },
+  { id: "kw_xfinity",    keyword: "xfinity",           categoryId: "utilities"     },
+  { id: "kw_spectrum",   keyword: "spectrum",          categoryId: "utilities"     },
+  { id: "kw_verizon",    keyword: "verizon",           categoryId: "utilities"     },
+  // Health Insurance (separate)
+  { id: "kw_aetna",      keyword: "aetna",             categoryId: "health_ins"    },
+  { id: "kw_ambetter",   keyword: "ambetter",          categoryId: "health_ins"    },
+  { id: "kw_guardian",   keyword: "guardian",          categoryId: "health_ins"    },
+  // Healthcare (dental + medical)
+  { id: "kw_dental",     keyword: "dental",            categoryId: "healthcare"    },
+  { id: "kw_napaa",      keyword: "napaanesth",        categoryId: "healthcare"    },
+  { id: "kw_peds_uro",   keyword: "pediatric urology", categoryId: "healthcare"    },
+  { id: "kw_serene",     keyword: "serene",            categoryId: "healthcare"    },
+  { id: "kw_kelsey",     keyword: "kelsey",            categoryId: "healthcare"    },
+  { id: "kw_memorial",   keyword: "memorial herma",    categoryId: "healthcare"    },
+  // Credit Cards
+  { id: "kw_apple",      keyword: "applecard",         categoryId: "credit_cards"  },
+  { id: "kw_citi",       keyword: "citi",              categoryId: "credit_cards"  },
+  { id: "kw_sync",       keyword: "synchrony bank",    categoryId: "credit_cards"  },
+  { id: "kw_wf_cred",    keyword: "wf credit",         categoryId: "credit_cards"  },
+  // Loans & Debt
+  { id: "kw_wf_pay",     keyword: "wf payment",        categoryId: "loans_debt"    },
+  { id: "kw_amoco",      keyword: "amoco",             categoryId: "loans_debt"    },
+  { id: "kw_jgw",        keyword: "jgw",               categoryId: "loans_debt"    },
+  { id: "kw_oportun",    keyword: "oportun",           categoryId: "loans_debt"    },
+  // Personal Care
+  { id: "kw_fitness",    keyword: "fitness",           categoryId: "personal_care" },
+  { id: "kw_sally",      keyword: "sally",             categoryId: "personal_care" },
+  { id: "kw_salon",      keyword: "salon",             categoryId: "personal_care" },
+  // Entertainment
+  { id: "kw_netflix",    keyword: "netflix",           categoryId: "entertainment" },
+  { id: "kw_spotify",    keyword: "spotify",           categoryId: "entertainment" },
+  { id: "kw_hulu",       keyword: "hulu",              categoryId: "entertainment" },
+  { id: "kw_disney",     keyword: "disney+",           categoryId: "entertainment" },
+  { id: "kw_sub",        keyword: "subscription",      categoryId: "entertainment" },
+  { id: "kw_movie",      keyword: "movie",             categoryId: "entertainment" },
   // Baby
-  { id: "kw_carters",    keyword: "carters",          categoryId: "baby"         },
+  { id: "kw_carters",    keyword: "carters",           categoryId: "baby"          },
+  // Pets
+  { id: "kw_rainwalk",   keyword: "rainwalk",          categoryId: "pets"          },
+  { id: "kw_petco",      keyword: "petco",             categoryId: "pets"          },
+  { id: "kw_petsmart",   keyword: "petsmart",          categoryId: "pets"          },
   // Contribution
-  { id: "kw_tithe",      keyword: "tithe.ly",         categoryId: "contribution" },
-  // Subscriptions
-  { id: "kw_sub",        keyword: "subscription",     categoryId: "subscriptions"},
-  { id: "kw_netflix",    keyword: "netflix",          categoryId: "subscriptions"},
-  { id: "kw_spotify",    keyword: "spotify",          categoryId: "subscriptions"},
-  { id: "kw_hulu",       keyword: "hulu",             categoryId: "subscriptions"},
-  { id: "kw_disney",     keyword: "disney+",          categoryId: "subscriptions"},
-  // Entertainment  
-  { id: "kw_movie",      keyword: "movie",            categoryId: "entertainment"},
-  { id: "kw_cinema",     keyword: "cinema",           categoryId: "entertainment"},
+  { id: "kw_tithe",      keyword: "tithe.ly",          categoryId: "contribution"  },
+  // Notary
+  { id: "kw_notary",     keyword: "notary",            categoryId: "notary"        },
   // Shopping / Misc
-  { id: "kw_amazon",     keyword: "amazon",           categoryId: "shopping"     },
-  { id: "kw_homedepot",  keyword: "home depot",       categoryId: "shopping"     },
-  { id: "kw_oportun",    keyword: "oportun",          categoryId: "shopping"     },
-  { id: "kw_target",     keyword: "target",           categoryId: "shopping"     },
-  // Transportation
-  { id: "kw_hctra",      keyword: "hctra",            categoryId: "transport"    },
-  { id: "kw_parking",    keyword: "parking",          categoryId: "transport"    },
-  { id: "kw_uber",       keyword: "uber",             categoryId: "transport"    },
-  { id: "kw_lyft",       keyword: "lyft",             categoryId: "transport"    },
+  { id: "kw_amazon",     keyword: "amazon",            categoryId: "shopping"      },
+  { id: "kw_homedepot",  keyword: "home depot",        categoryId: "shopping"      },
+  { id: "kw_target",     keyword: "target",            categoryId: "shopping"      },
   // Travel
-  { id: "kw_iah",        keyword: "iah",              categoryId: "travel"       },
-  { id: "kw_airport",    keyword: "airport",          categoryId: "travel"       },
-  { id: "kw_hotel",      keyword: "hotel",            categoryId: "travel"       },
+  { id: "kw_iah",        keyword: "iah",               categoryId: "travel"        },
+  { id: "kw_airport",    keyword: "airport",           categoryId: "travel"        },
+  { id: "kw_hotel",      keyword: "hotel",             categoryId: "travel"        },
   // Work
-  { id: "kw_mailmeteor", keyword: "mailmeteor",       categoryId: "work"         },
+  { id: "kw_mailmeteor", keyword: "mailmeteor",        categoryId: "work"          },
 ];
+
+// ── Category ID migration map (old → new consolidated IDs) ───────────────────
+const CAT_MIGRATION = {
+  "marcus":        "savings",
+  "gasoline":      "transport",
+  "phone":         "utilities",
+  "wifi":          "utilities",
+  "electricity":   "utilities",
+  "dental":        "healthcare",
+  "medical":       "healthcare",
+  "apple_card":    "credit_cards",
+  "citi_card":     "credit_cards",
+  "care_credit":   "credit_cards",
+  "wells_fargo":   "credit_cards",
+  "car_payment":   "loans_debt",
+  "amoco_loan":    "loans_debt",
+  "jgw":           "loans_debt",
+  "fitness":       "personal_care",
+  "self_care":     "personal_care",
+  "subscriptions": "entertainment",
+  "dogs":          "pets",
+};
+const migrateCategories = (txns) =>
+  txns.map(t => ({ ...t, categoryId: CAT_MIGRATION[t.categoryId] ?? t.categoryId }));
+
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -398,7 +411,7 @@ export default function BudgetApp() {
             sb.getAll("schedule"),
             sb.getAll("custom_keywords"),
           ]);
-          if (txns.length) setTransactions(txns);
+          if (txns.length) setTransactions(migrateCategories(txns));
           if (cats.length) setCategories(cats);
           if (bls.length) setBills(bls);
           if (sched.length) setSchedule(sched);
@@ -410,7 +423,7 @@ export default function BudgetApp() {
           console.warn("Supabase load failed, falling back to local", e);
           const saved = localLoad();
           if (saved) {
-            if (saved.transactions) setTransactions(saved.transactions);
+            if (saved.transactions) setTransactions(migrateCategories(saved.transactions));
             if (saved.categories) setCategories(saved.categories);
             if (saved.bills) setBills(saved.bills);
             if (saved.schedule) setSchedule(saved.schedule);
@@ -420,7 +433,7 @@ export default function BudgetApp() {
       } else {
         const saved = localLoad();
         if (saved) {
-          if (saved.transactions) setTransactions(saved.transactions);
+          if (saved.transactions) setTransactions(migrateCategories(saved.transactions));
           if (saved.categories) setCategories(saved.categories);
           if (saved.bills) setBills(saved.bills);
           if (saved.schedule) setSchedule(saved.schedule);
@@ -954,6 +967,10 @@ export default function BudgetApp() {
                             {txnCount} txn{txnCount !== 1 ? "s" : ""}
                           </span>
                         )}
+                        <button className="btn btn-ghost" style={{ padding: "3px 7px" }}
+                          onClick={e => { e.stopPropagation(); setModal({ type: "editCategory", cat }); }}>
+                          <Edit2 size={12} />
+                        </button>
                         <button className="btn btn-danger" style={{ padding: "3px 7px" }}
                           onClick={e => { e.stopPropagation(); setCategories(prev => prev.filter(c => c.id !== cat.id)); if(dbStatus==="connected") sb.remove("categories", cat.id); }}>
                           <Trash2 size={12} />
@@ -961,7 +978,7 @@ export default function BudgetApp() {
                       </div>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                      <span style={{ fontSize: 13, color: T.muted }}>Spent</span>
+                      <span style={{ fontSize: 13, color: T.muted }}>Spent this period</span>
                       <span style={{ fontSize: 13, color: over ? T.coral : T.text }}>{fmt(spent)} {cat.budget > 0 && `/ ${fmt(cat.budget)}`}</span>
                     </div>
                     {cat.budget > 0 && (
@@ -1717,6 +1734,14 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
       if (!form.name) return;
       setCategories(prev => [...prev, { id: `c_${Date.now()}`, name: form.name, color: form.color || CATEGORY_COLORS[prev.length % CATEGORY_COLORS.length], budget: parseFloat(form.budget) || 0, type: form.type || "expense" }]);
       notify("Category added!");
+    } else if (modal.type === "editCategory") {
+      setCategories(prev => prev.map(c => c.id === modal.cat.id ? {
+        ...c,
+        name:   form.name   ?? c.name,
+        budget: form.budget !== undefined ? (parseFloat(form.budget) || 0) : c.budget,
+        color:  form.color  ?? c.color,
+      } : c));
+      notify("Category updated!");
     } else if (modal.type === "addBill") {
       if (!form.name || !form.amount) return;
       setBills(prev => [...prev, { id: `b_${Date.now()}`, name: form.name, amount: parseFloat(form.amount), dueDay: parseInt(form.dueDay) || 1, isPaid: false, categoryId: form.categoryId || "other", isRecurring: true }]);
@@ -1753,7 +1778,7 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
     close();
   };
 
-  const titles = { addCategory: "Add Category", addBill: "Add Bill", addSchedule: "Schedule Event", addTransaction: "Add Transaction", addKeyword: "Add Keyword Rule", columnMapper: "Match Your CSV Columns", categoryDrilldown: "", addSavingsGoal: "Add Savings Goal", editSavingsGoal: "Edit Savings Goal", setupWizard: "" };
+  const titles = { addCategory: "Add Category", addBill: "Add Bill", addSchedule: "Schedule Event", addTransaction: "Add Transaction", addKeyword: "Add Keyword Rule", columnMapper: "Match Your CSV Columns", categoryDrilldown: "", addSavingsGoal: "Add Savings Goal", editSavingsGoal: "Edit Savings Goal", setupWizard: "", editCategory: "Edit Category" };
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && close()}>
@@ -1782,6 +1807,27 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {CATEGORY_COLORS.map(c => (
                 <button key={c} onClick={() => set("color", c)} style={{ width: 28, height: 28, borderRadius: "50%", background: c, border: form.color === c ? `3px solid ${T.white}` : "3px solid transparent", cursor: "pointer" }} />
+              ))}
+            </div>
+          </>}
+
+          {modal.type === "editCategory" && <>
+            <div style={{ fontSize: 12, color: T.muted, marginBottom: 4 }}>Category Name</div>
+            <input className="input" defaultValue={modal.cat?.name} onChange={e => set("name", e.target.value)} />
+            <div style={{ fontSize: 12, color: T.muted, marginTop: 8, marginBottom: 4 }}>Monthly Budget ($)</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
+              <span style={{ padding: "9px 10px", background: "rgba(255,255,255,0.04)", border: `1px solid ${T.border}`, borderRight: "none", borderRadius: "10px 0 0 10px", fontSize: 14, color: T.muted }}>$</span>
+              <input type="number" className="input" defaultValue={modal.cat?.budget || ""}
+                placeholder="0 = no limit"
+                onChange={e => set("budget", e.target.value)}
+                style={{ borderRadius: "0 10px 10px 0", borderLeft: "none" }} />
+            </div>
+            <div style={{ fontSize: 11, color: T.muted }}>Set to 0 for no monthly limit (e.g. Income, Savings)</div>
+            <div style={{ fontSize: 12, color: T.muted, marginTop: 8, marginBottom: 6 }}>Color</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {[...CATEGORY_COLORS, "#6BCB77","#F87171","#60A5FA","#A3E635","#FDE68A","#94A3B8"].map(c => (
+                <button key={c} onClick={() => set("color", c)}
+                  style={{ width: 28, height: 28, borderRadius: "50%", background: c, border: `3px solid ${(form.color ?? modal.cat?.color) === c ? T.white : "transparent"}`, cursor: "pointer" }} />
               ))}
             </div>
           </>}
