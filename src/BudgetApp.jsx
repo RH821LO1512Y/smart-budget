@@ -562,7 +562,10 @@ export default function BudgetApp() {
           // Date: must contain "date" but NOT "update"
           const dateCol = h.findIndex(x => /\bdate\b/.test(x) && !/update/.test(x));
           // Description: explicitly named merchant/payee/desc/narr/memo but NOT "type"
-          let descCol = h.findIndex(x => /\b(payee|merchant|description|narration|memo|particulars|reference|details|beneficiary)\b/.test(x));
+          // Prioritize exact payee/merchant/description — avoid "reference number", "details" etc.
+          let descCol = h.findIndex(x => /^(payee|merchant|description|narration|memo|particulars|beneficiary|transaction description|transaction detail)$/.test(x));
+          // Fallback: contains the word but isn't "reference number" or "account details" etc.
+          if (descCol === -1) descCol = h.findIndex(x => /\b(payee|merchant|memo|narration)\b/.test(x));
           // Amount: single amount column
           let amtCol = h.findIndex(x => /^(amount|transaction amount|amt|transaction amt|net amount|running balance)$/.test(x));
           // Separate debit/credit columns
@@ -600,16 +603,14 @@ export default function BudgetApp() {
             if (allJunk) colMap.descCol = -1; // reject — force column mapper
           }
 
-          // If description column not confidently found, open column mapper
-          if (colMap.descCol === -1) {
-            // Try to detect bank from headers
+          // Detect bank and always open mapper so user can verify/select bank
           let detectedBank = null;
           const headerStr = rawHeaders.map(h => h.toLowerCase()).join("|");
           if (headerStr.includes("posted date") && headerStr.includes("payee")) detectedBank = "bofa";
           else if (headerStr.includes("posting date") && headerStr.includes("description")) detectedBank = "chase";
+          // Always show mapper — lets user pick bank & verify columns
           setModal({ type: "columnMapper", headers: rawHeaders, dataRows, colMap, detectedBank });
-            return;
-          }
+          return;
 
           dataRows.forEach((cols, i) => {
             const desc = cols[colMap.descCol] || `Transaction ${i + 1}`;
