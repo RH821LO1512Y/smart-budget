@@ -1476,7 +1476,8 @@ function SetupWizard({ categories, setCategories, setCustomKeywords, onComplete 
   const [vals, setVals] = useState({
     rent: "", car_payment: "", gasoline: "", car_insurance: "",
     health_ins: "", dental: "", electricity: "", wifi: "", phone: "",
-    food: "", grocery: "", income_keyword: "direct deposit",
+    food: "", grocery: "",
+    income_kw1: "direct deposit", income_kw2: "", income_kw3: "",
   });
 
   const set = (k, v) => setVals(prev => ({ ...prev, [k]: v }));
@@ -1513,12 +1514,18 @@ function SetupWizard({ categories, setCategories, setCustomKeywords, onComplete 
         ? { ...c, budget: budgetMap[c.id] }
         : c
     ));
-    // Add custom income keyword if provided
-    if (vals.income_keyword.trim()) {
+    // Add all income keywords provided
+    const incomeKws = [vals.income_kw1, vals.income_kw2, vals.income_kw3]
+      .map(k => k.trim().toLowerCase()).filter(Boolean);
+    if (incomeKws.length) {
       setCustomKeywords(prev => {
-        const kw = vals.income_keyword.toLowerCase().trim();
-        if (prev.some(k => k.keyword === kw)) return prev;
-        return [...prev, { id: `kw_inc_${Date.now()}`, keyword: kw, categoryId: "income" }];
+        let updated = [...prev];
+        incomeKws.forEach((kw, i) => {
+          if (!updated.some(k => k.keyword === kw)) {
+            updated.push({ id: `kw_inc_${Date.now()}_${i}`, keyword: kw, categoryId: "income" });
+          }
+        });
+        return updated;
       });
     }
     // Car insurance — add as custom keyword rule + category if not exists
@@ -1530,10 +1537,21 @@ function SetupWizard({ categories, setCategories, setCustomKeywords, onComplete 
         return [...prev, { id: "car_insurance", name: "Car Insurance", color: "#FBBF24", budget: parseFloat(vals.car_insurance), type: "expense" }];
       });
     }
-    onComplete();
+    // budgets saved — next() will advance to done screen then close on "Get Started!"
   };
 
-  const next = () => { if (step < WIZARD_STEPS.length - 1) setStep(s => s + 1); else applyAndFinish(); };
+  const next = () => {
+    const lastDataStep = WIZARD_STEPS.length - 2; // step before "done"
+    if (step < lastDataStep) {
+      setStep(s => s + 1);
+    } else if (step === lastDataStep) {
+      applyAndFinish(); // save everything, then advance to done screen
+      setStep(s => s + 1);
+    } else {
+      // On done screen — just close
+      onComplete();
+    }
+  };
   const back = () => setStep(s => Math.max(0, s - 1));
 
   const s = WIZARD_STEPS[step];
@@ -1587,14 +1605,25 @@ function SetupWizard({ categories, setCategories, setCustomKeywords, onComplete 
           {renderField("Monthly Grocery Budget", "grocery", "0.00")}
         </>}
         {step === 6 && (
-          <div>
-            <div style={{ fontSize: 13, color: T.muted, marginBottom: 8, lineHeight: 1.5 }}>
-              Type a word or phrase that always appears in your paycheck transactions.<br/>
-              For example: <span style={{ color: T.teal }}>"direct deposit"</span>, your employer name, or <span style={{ color: T.teal }}>"payroll"</span>.
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ fontSize: 13, color: T.muted, lineHeight: 1.6 }}>
+              Add up to 3 keywords or phrases that appear in your income transactions —
+              like your employer name, <span style={{ color: T.teal }}>"direct deposit"</span>, or a side income source.
             </div>
-            <input className="input" placeholder='e.g. "direct deposit" or your employer name'
-              value={vals.income_keyword}
-              onChange={e => set("income_keyword", e.target.value)} />
+            {[
+              { field: "income_kw1", label: "Primary income (e.g. employer name or "direct deposit")", required: true },
+              { field: "income_kw2", label: "Second income source (optional)" },
+              { field: "income_kw3", label: "Third income source (optional)" },
+            ].map(({ field, label, required }) => (
+              <div key={field}>
+                <div style={{ fontSize: 12, color: T.muted, marginBottom: 4 }}>
+                  {label} {required && <span style={{ color: T.coral }}>*</span>}
+                </div>
+                <input className="input" placeholder="e.g. acme corp, zelle, freelance..."
+                  value={vals[field]}
+                  onChange={e => set(field, e.target.value)} />
+              </div>
+            ))}
           </div>
         )}
         {step === WIZARD_STEPS.length - 1 && (
@@ -1620,7 +1649,7 @@ function SetupWizard({ categories, setCategories, setCustomKeywords, onComplete 
             <button className="btn btn-ghost" onClick={onComplete}>Skip setup</button>
           )}
           <button className="btn btn-primary" onClick={next}>
-            {step === WIZARD_STEPS.length - 2 ? "Finish →" : step === WIZARD_STEPS.length - 1 ? "Get Started!" : "Next →"}
+            {step === WIZARD_STEPS.length - 2 ? "Save & Finish →" : step === WIZARD_STEPS.length - 1 ? "Get Started! 🚀" : "Next →"}
           </button>
         </div>
       </div>
