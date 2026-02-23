@@ -1566,7 +1566,7 @@ function SetupWizard({ categories, setCategories, setCustomKeywords, onComplete 
             </div>
           </div>
         )}
-        {step === 1 && {renderField("Monthly Rent or Mortgage", "rent", "0.00")}}
+        {step === 1 && renderField("Monthly Rent or Mortgage", "rent", "0.00")}
         {step === 2 && <>
           {renderField("Monthly Car Payment", "car_payment", "0.00")}
           {renderField("Monthly Gas Budget", "gasoline", "0.00")}
@@ -1578,7 +1578,7 @@ function SetupWizard({ categories, setCategories, setCustomKeywords, onComplete 
         </>}
         {step === 4 && <>
           {renderField("Monthly Electricity Bill", "electricity", "0.00")}
-          <Field label="Monthly Wi-Fi / Internet" field="wifi" />
+          {renderField("Monthly Wi-Fi / Internet", "wifi", "0.00")}
           {renderField("Monthly Phone Bill", "phone", "0.00")}
         </>}
         {step === 5 && <>
