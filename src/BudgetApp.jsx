@@ -169,6 +169,43 @@ const DEFAULT_KEYWORDS = [
   { id: "kw_mailmeteor", keyword: "mailmeteor",        categoryId: "work"          },
 ];
 
+// ── Bank CSV presets ─────────────────────────────────────────────────────────
+const BANK_PRESETS = {
+  bofa: {
+    name: "Bank of America",
+    logo: "🏦",
+    // Header names (lowercase matched)
+    date: "posted date",
+    desc: "payee",
+    amount: "amount",
+    debit: null,
+    credit: null,
+    hasHeaders: true,
+  },
+  chase: {
+    name: "Chase",
+    logo: "🏛️",
+    date: "posting date",
+    desc: "description",
+    amount: "amount",
+    debit: null,
+    credit: null,
+    hasHeaders: true,
+  },
+  wellsfargo: {
+    name: "Wells Fargo",
+    logo: "🐎",
+    // No headers — positional (0-indexed)
+    date: 0,       // Col A
+    amount: 1,     // Col B
+    desc: 4,       // Col E
+    debit: null,
+    credit: null,
+    hasHeaders: false,
+  },
+};
+
+
 // ── Category ID migration map (old → new consolidated IDs) ───────────────────
 const CAT_MIGRATION = {
   "marcus":        "savings",
@@ -540,6 +577,16 @@ export default function BudgetApp() {
 
         if (ext === "csv") {
           const allRows = parseCsvLines(e.target.result).filter(r => r.length > 1);
+          // Detect headerless CSV (Wells Fargo style): first cell looks like a date, not a label
+          const firstCell = (allRows[0]?.[0] || "").trim();
+          const looksLikeDate = /^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(firstCell);
+          if (looksLikeDate) {
+            // Headerless — inject positional headers and open mapper pre-filled for WF
+            rawHeaders = allRows[0].map((_, i) => `Column ${i + 1}`);
+            colMap = { dateCol: 0, descCol: 4, amtCol: 1, debitCol: -1, creditCol: -1, headers: rawHeaders };
+            setModal({ type: "columnMapper", headers: rawHeaders, dataRows: allRows, colMap, detectedBank: "wellsfargo" });
+            return;
+          }
           rawHeaders = allRows[0];
           colMap = detectCols(rawHeaders);
           const dataRows = allRows.slice(1);
@@ -555,7 +602,12 @@ export default function BudgetApp() {
 
           // If description column not confidently found, open column mapper
           if (colMap.descCol === -1) {
-            setModal({ type: "columnMapper", headers: rawHeaders, dataRows, colMap });
+            // Try to detect bank from headers
+          let detectedBank = null;
+          const headerStr = rawHeaders.map(h => h.toLowerCase()).join("|");
+          if (headerStr.includes("posted date") && headerStr.includes("payee")) detectedBank = "bofa";
+          else if (headerStr.includes("posting date") && headerStr.includes("description")) detectedBank = "chase";
+          setModal({ type: "columnMapper", headers: rawHeaders, dataRows, colMap, detectedBank });
             return;
           }
 
@@ -822,6 +874,28 @@ export default function BudgetApp() {
                   </div>
                 </div>
 
+                {/* Line */}
+                <div className="card" style={{ gridColumn: "1 / -1" }}>
+                  <div style={{ fontFamily: "Syne", fontWeight: 600, marginBottom: 16 }}>Savings Trend</div>
+                  {savingsLine.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={180}>
+                      <AreaChart data={savingsLine}>
+                        <defs>
+                          <linearGradient id="savGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor={T.teal} stopOpacity={0.3} />
+                            <stop offset="95%" stopColor={T.teal} stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke={T.border} />
+                        <XAxis dataKey="label" tick={{ fontSize: 11, fill: T.muted }} axisLine={false} />
+                        <YAxis tick={{ fontSize: 11, fill: T.muted }} axisLine={false} tickFormatter={v => `$${(v/1000).toFixed(1)}k`} />
+                        <Tooltip formatter={(v) => fmt(v)} contentStyle={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 8, color: T.text, fontSize: 13 }} />
+                        <Area type="monotone" dataKey="savings" stroke={T.teal} strokeWidth={2} fill="url(#savGrad)" name="Cumulative Savings" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  ) : <div style={{ color: T.muted, fontSize: 13, textAlign: "center", padding: 40 }}>Savings data will appear here</div>}
+                </div>
+
                 {/* Bar */}
                 <div className="card">
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -904,27 +978,6 @@ export default function BudgetApp() {
                   })()}
                 </div>
 
-                {/* Line */}
-                <div className="card" style={{ gridColumn: "1 / -1" }}>
-                  <div style={{ fontFamily: "Syne", fontWeight: 600, marginBottom: 16 }}>Savings Trend</div>
-                  {savingsLine.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={180}>
-                      <AreaChart data={savingsLine}>
-                        <defs>
-                          <linearGradient id="savGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={T.teal} stopOpacity={0.3} />
-                            <stop offset="95%" stopColor={T.teal} stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke={T.border} />
-                        <XAxis dataKey="label" tick={{ fontSize: 11, fill: T.muted }} axisLine={false} />
-                        <YAxis tick={{ fontSize: 11, fill: T.muted }} axisLine={false} tickFormatter={v => `$${(v/1000).toFixed(1)}k`} />
-                        <Tooltip formatter={(v) => fmt(v)} contentStyle={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 8, color: T.text, fontSize: 13 }} />
-                        <Area type="monotone" dataKey="savings" stroke={T.teal} strokeWidth={2} fill="url(#savGrad)" name="Cumulative Savings" />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  ) : <div style={{ color: T.muted, fontSize: 13, textAlign: "center", padding: 40 }}>Savings data will appear here</div>}
-                </div>
               </div>
             ) : (
               /* Upload prompt on dashboard */
@@ -1782,14 +1835,40 @@ function SetupWizard({ categories, setCategories, setCustomKeywords, onComplete 
 
 // ─── Column Mapper Component ─────────────────────────────────────────────────
 function ColumnMapper({ modal, categories, customKeywords, setTransactions, notify, close, guessCategory }) {
-  const { headers, dataRows, colMap } = modal;
-  const [map, setMap] = useState({
-    date: colMap.dateCol >= 0 ? colMap.dateCol : -1,
-    desc: colMap.descCol >= 0 ? colMap.descCol : -1,
-    amount: colMap.amtCol >= 0 ? colMap.amtCol : -1,
-    debit: colMap.debitCol >= 0 ? colMap.debitCol : -1,
-    credit: colMap.creditCol >= 0 ? colMap.creditCol : -1,
-  });
+  const { headers, dataRows, colMap, detectedBank } = modal;
+
+  // Build initial map — prefer detected bank preset if available
+  const buildMapFromPreset = (bankKey, hdrs) => {
+    const p = BANK_PRESETS[bankKey];
+    if (!p) return null;
+    const h = hdrs.map(x => (x||"").toLowerCase().trim());
+    if (p.hasHeaders) {
+      return {
+        date:   h.indexOf(p.date),
+        desc:   h.indexOf(p.desc),
+        amount: p.amount ? h.indexOf(p.amount) : -1,
+        debit:  p.debit  ? h.indexOf(p.debit)  : -1,
+        credit: p.credit ? h.indexOf(p.credit)  : -1,
+      };
+    } else {
+      // Positional (no headers)
+      return { date: p.date, desc: p.desc, amount: p.amount ?? -1, debit: p.debit ?? -1, credit: p.credit ?? -1 };
+    }
+  };
+
+  const defaultMap = detectedBank
+    ? (buildMapFromPreset(detectedBank, headers) || { date: colMap.dateCol >= 0 ? colMap.dateCol : -1, desc: colMap.descCol >= 0 ? colMap.descCol : -1, amount: colMap.amtCol >= 0 ? colMap.amtCol : -1, debit: colMap.debitCol >= 0 ? colMap.debitCol : -1, credit: colMap.creditCol >= 0 ? colMap.creditCol : -1 })
+    : { date: colMap.dateCol >= 0 ? colMap.dateCol : -1, desc: colMap.descCol >= 0 ? colMap.descCol : -1, amount: colMap.amtCol >= 0 ? colMap.amtCol : -1, debit: colMap.debitCol >= 0 ? colMap.debitCol : -1, credit: colMap.creditCol >= 0 ? colMap.creditCol : -1 };
+
+  const [map, setMap] = useState(defaultMap);
+  const [selectedBank, setSelectedBank] = useState(detectedBank || "");
+
+  const applyBank = (bankKey) => {
+    setSelectedBank(bankKey);
+    if (!bankKey) return;
+    const preset = buildMapFromPreset(bankKey, headers);
+    if (preset) setMap(preset);
+  };
 
   const preview = dataRows.slice(0, 3);
 
@@ -1825,8 +1904,26 @@ function ColumnMapper({ modal, categories, customKeywords, setTransactions, noti
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+      {/* Bank selector */}
+      <div>
+        <div style={{ fontSize: 12, color: T.muted, marginBottom: 6 }}>Your bank <span style={{ color: T.muted, fontWeight: 400 }}>(optional — auto-fills columns)</span></div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {[{ key: "", label: "Other / Unknown" }, ...Object.entries(BANK_PRESETS).map(([k, v]) => ({ key: k, label: `${v.logo} ${v.name}` }))].map(b => (
+            <button key={b.key} onClick={() => applyBank(b.key)}
+              style={{ padding: "6px 12px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "DM Sans",
+                background: selectedBank === b.key ? T.teal : "rgba(255,255,255,0.05)",
+                color: selectedBank === b.key ? "#0a0a1a" : T.text,
+                border: `1px solid ${selectedBank === b.key ? T.teal : T.border}` }}>
+              {b.label}
+            </button>
+          ))}
+        </div>
+        {selectedBank && <div style={{ fontSize: 11, color: T.teal, marginTop: 6 }}>✓ Columns auto-filled for {BANK_PRESETS[selectedBank]?.name}. Verify below and adjust if needed.</div>}
+      </div>
+
       <div style={{ fontSize: 13, color: T.muted, lineHeight: 1.5, background: "rgba(78,205,196,0.07)", border: `1px solid rgba(78,205,196,0.2)`, borderRadius: 10, padding: 12 }}>
-        The app couldn't automatically detect which column contains the merchant/description. Please match each field to the correct column from your file.
+        {selectedBank ? `Columns pre-filled for ${BANK_PRESETS[selectedBank]?.name}. Review the preview below and click Import when ready.` : "Select your bank above for automatic column detection, or match each field manually."}
       </div>
 
       {/* Column selectors */}
