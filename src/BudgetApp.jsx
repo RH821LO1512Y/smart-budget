@@ -393,6 +393,8 @@ export default function BudgetApp() {
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [uploadDrag, setUploadDrag] = useState(false);
+  const [sortCol, setSortCol] = useState("date");
+  const [sortDir, setSortDir] = useState("desc");
   const [notification, setNotification] = useState(null);
   const [modal, setModal] = useState(null);
   const fileRef = useRef();
@@ -594,10 +596,27 @@ export default function BudgetApp() {
   // Filter transactions to selected date range
   const rangeStart = dateRange.start ? new Date(dateRange.start + "T00:00:00") : null;
   const rangeEnd   = dateRange.end   ? new Date(dateRange.end   + "T23:59:59") : null;
+
+  // Normalize various date formats to a comparable Date object
+  const parseDate = (raw) => {
+    if (!raw) return null;
+    // Already ISO format YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return new Date(raw + "T12:00:00");
+    // M/D/YY or MM/DD/YY or M/D/YYYY
+    const slashMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+    if (slashMatch) {
+      let [, m, d, y] = slashMatch;
+      if (y.length === 2) y = "20" + y;
+      return new Date(`${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}T12:00:00`);
+    }
+    // Fallback
+    const d = new Date(raw);
+    return isNaN(d) ? null : d;
+  };
+
   const monthTxns = transactions.filter(t => {
-    if (!t.date) return false;
-    const d = new Date(t.date + (t.date.length === 10 ? "T12:00:00" : ""));
-    if (isNaN(d)) return false;
+    const d = parseDate(t.date);
+    if (!d) return false;
     if (rangeStart && d < rangeStart) return false;
     if (rangeEnd   && d > rangeEnd)   return false;
     return true;
@@ -628,8 +647,11 @@ export default function BudgetApp() {
       map[key] = { label: MONTHS[d.getMonth()] + " '" + d.getFullYear().toString().slice(2), income: 0, expenses: 0 };
     }
     transactions.forEach(t => {
-      const d = new Date(t.date + "T12:00:00");
-      if (isNaN(d)) return;
+      const raw = t.date;
+      let d = null;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) d = new Date(raw + "T12:00:00");
+      else { const m = raw && raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/); if(m){let[,mo,dy,y]=m;if(y.length===2)y="20"+y;d=new Date(`${y}-${mo.padStart(2,"0")}-${dy.padStart(2,"0")}T12:00:00`);}else{d=new Date(raw);if(isNaN(d))d=null;} }
+      if (!d) return;
       const key = `${d.getFullYear()}-${d.getMonth()}`;
       if (!map[key]) return; // outside 6-month window
       if (t.amount > 0) map[key].income += t.amount;
@@ -797,18 +819,24 @@ export default function BudgetApp() {
                 {/* Bar */}
                 <div className="card">
                   <div style={{ fontFamily: "Syne", fontWeight: 600, marginBottom: 16 }}>Income vs Expenses</div>
-                  {monthlyData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart data={monthlyData} barGap={4}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={T.border} />
-                        <XAxis dataKey="label" tick={{ fontSize: 11, fill: T.muted }} axisLine={false} />
-                        <YAxis tick={{ fontSize: 11, fill: T.muted }} axisLine={false} tickFormatter={v => `$${(v/1000).toFixed(1)}k`} />
-                        <Tooltip formatter={(v) => fmt(v)} contentStyle={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 8, color: T.text, fontSize: 13 }} />
-                        <Bar dataKey="income" fill={T.green} radius={[4, 4, 0, 0]} name="Income" />
-                        <Bar dataKey="expenses" fill={T.coral} radius={[4, 4, 0, 0]} name="Expenses" />
+                  {monthlyData.some(m => m.income > 0 || m.expenses > 0) ? (
+                    <ResponsiveContainer width="100%" height={260}>
+                      <BarChart data={monthlyData.map(m => ({ ...m, expensesNeg: -m.expenses }))} barGap={2} barCategoryGap="25%">
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+                        <XAxis dataKey="label" tick={{ fontSize: 11, fill: T.muted }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 11, fill: T.muted }} axisLine={false} tickLine={false}
+                          tickFormatter={v => `$${Math.abs(v/1000).toFixed(1)}k`} />
+                        <Tooltip
+                          formatter={(v, name) => [fmt(Math.abs(v)), name]}
+                          contentStyle={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 8, color: T.text, fontSize: 13 }} />
+                        <ReferenceLine y={0} stroke="rgba(255,255,255,0.2)" strokeWidth={1.5} />
+                        <Bar dataKey="income" fill="#A78BFA" radius={[4, 4, 0, 0]} name="Income" />
+                        <Bar dataKey="expensesNeg" fill="#4ADE80" radius={[0, 0, 4, 4]} name="Expenses" />
+                        <Legend formatter={(v) => v === "expensesNeg" ? "Expenses" : v}
+                          wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
                       </BarChart>
                     </ResponsiveContainer>
-                  ) : <div style={{ color: T.muted, fontSize: 13, textAlign: "center", padding: 40 }}>Upload transactions to see monthly data</div>}
+                  ) : <div style={{ color: T.muted, fontSize: 13, textAlign: "center", padding: 40 }}>Upload transactions to see monthly trends</div>}
                 </div>
 
                 {/* Line */}
@@ -883,15 +911,39 @@ export default function BudgetApp() {
                   <table>
                     <thead>
                       <tr>
-                        <th>Date</th>
-                        <th>Description</th>
-                        <th>Category</th>
-                        <th style={{ textAlign: "right" }}>Amount</th>
+                        {[
+                          { key: "date", label: "Date" },
+                          { key: "description", label: "Description" },
+                          { key: "category", label: "Category" },
+                          { key: "amount", label: "Amount", right: true },
+                        ].map(col => (
+                          <th key={col.key} style={{ textAlign: col.right ? "right" : "left", cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }}
+                            onClick={() => { if (sortCol === col.key) setSortDir(d => d === "asc" ? "desc" : "asc"); else { setSortCol(col.key); setSortDir(col.key === "amount" ? "desc" : "asc"); } }}>
+                            {col.label}
+                            <span style={{ marginLeft: 4, opacity: sortCol === col.key ? 1 : 0.3, fontSize: 10 }}>
+                              {sortCol === col.key ? (sortDir === "asc" ? "▲" : "▼") : "▲▼"}
+                            </span>
+                          </th>
+                        ))}
                         <th></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {transactions.slice(0, 100).map(t => {
+                      {[...transactions].sort((a, b) => {
+                        const dir = sortDir === "asc" ? 1 : -1;
+                        if (sortCol === "date") {
+                          const da = new Date(a.date), db = new Date(b.date);
+                          return (da - db) * dir;
+                        }
+                        if (sortCol === "amount") return (a.amount - b.amount) * dir;
+                        if (sortCol === "description") return a.description.localeCompare(b.description) * dir;
+                        if (sortCol === "category") {
+                          const ca = categories.find(c => c.id === a.categoryId)?.name || "";
+                          const cb = categories.find(c => c.id === b.categoryId)?.name || "";
+                          return ca.localeCompare(cb) * dir;
+                        }
+                        return 0;
+                      }).slice(0, 200).map(t => {
                         const cat = categories.find(c => c.id === t.categoryId);
                         return (
                           <tr key={t.id}>
@@ -1356,12 +1408,18 @@ function CategoryDrilldown({ modal, categories, transactions, setTransactions, d
   const { dateRange } = modal;
   const rStart = dateRange?.start ? new Date(dateRange.start + "T00:00:00") : null;
   const rEnd   = dateRange?.end   ? new Date(dateRange.end   + "T23:59:59") : null;
+  const parseDateLocal = (raw) => {
+    if (!raw) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return new Date(raw + "T12:00:00");
+    const m = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+    if (m) { let [,mo,d,y]=m; if(y.length===2)y="20"+y; return new Date(`${y}-${mo.padStart(2,"0")}-${d.padStart(2,"0")}T12:00:00`); }
+    const d2 = new Date(raw); return isNaN(d2) ? null : d2;
+  };
   const catTxns = transactions
     .filter(t => t.categoryId === cat.id)
     .filter(t => {
-      if (!t.date) return true;
-      const d = new Date(t.date + "T12:00:00");
-      if (isNaN(d)) return true;
+      const d = parseDateLocal(t.date);
+      if (!d) return true;
       if (rStart && d < rStart) return false;
       if (rEnd   && d > rEnd)   return false;
       return true;
