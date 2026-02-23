@@ -1480,6 +1480,18 @@ function SetupWizard({ categories, setCategories, setCustomKeywords, onComplete 
   });
 
   const set = (k, v) => setVals(prev => ({ ...prev, [k]: v }));
+  const renderField = (label, field, placeholder = "0.00", prefix = "$") => (
+    <div>
+      <div style={{ fontSize: 13, color: T.muted, marginBottom: 5 }}>{label}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
+        <span style={{ padding: "9px 10px", background: "rgba(255,255,255,0.04)", border: `1px solid ${T.border}`, borderRight: "none", borderRadius: "10px 0 0 10px", fontSize: 14, color: T.muted }}>{prefix}</span>
+        <input type="number" className="input" placeholder={placeholder}
+          value={vals[field]}
+          onChange={e => set(field, e.target.value)}
+          style={{ borderRadius: "0 10px 10px 0", borderLeft: "none" }} />
+      </div>
+    </div>
+  );
   const pct = Math.round((step / (WIZARD_STEPS.length - 1)) * 100);
 
   const applyAndFinish = () => {
@@ -1526,18 +1538,6 @@ function SetupWizard({ categories, setCategories, setCustomKeywords, onComplete 
 
   const s = WIZARD_STEPS[step];
 
-  const Field = ({ label, field, placeholder = "0.00", prefix = "$" }) => (
-    <div>
-      <div style={{ fontSize: 13, color: T.muted, marginBottom: 5 }}>{label}</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
-        <span style={{ padding: "9px 10px", background: "rgba(255,255,255,0.04)", border: `1px solid ${T.border}`, borderRight: "none", borderRadius: "10px 0 0 10px", fontSize: 14, color: T.muted }}>{prefix}</span>
-        <input type="number" className="input" placeholder={placeholder}
-          value={vals[field]}
-          onChange={e => set(field, e.target.value)}
-          style={{ borderRadius: "0 10px 10px 0", borderLeft: "none" }} />
-      </div>
-    </div>
-  );
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
@@ -1566,24 +1566,24 @@ function SetupWizard({ categories, setCategories, setCustomKeywords, onComplete 
             </div>
           </div>
         )}
-        {step === 1 && <Field label="Monthly Rent or Mortgage" field="rent" />}
+        {step === 1 && {renderField("Monthly Rent or Mortgage", "rent", "0.00")}}
         {step === 2 && <>
-          <Field label="Monthly Car Payment" field="car_payment" />
-          <Field label="Monthly Gas Budget" field="gasoline" />
+          {renderField("Monthly Car Payment", "car_payment", "0.00")}
+          {renderField("Monthly Gas Budget", "gasoline", "0.00")}
         </>}
         {step === 3 && <>
-          <Field label="Monthly Health Insurance" field="health_ins" />
-          <Field label="Monthly Dental Insurance" field="dental" />
-          <Field label="Monthly Car Insurance" field="car_insurance" />
+          {renderField("Monthly Health Insurance", "health_ins", "0.00")}
+          {renderField("Monthly Dental Insurance", "dental", "0.00")}
+          {renderField("Monthly Car Insurance", "car_insurance", "0.00")}
         </>}
         {step === 4 && <>
-          <Field label="Monthly Electricity Bill" field="electricity" />
+          {renderField("Monthly Electricity Bill", "electricity", "0.00")}
           <Field label="Monthly Wi-Fi / Internet" field="wifi" />
-          <Field label="Monthly Phone Bill" field="phone" />
+          {renderField("Monthly Phone Bill", "phone", "0.00")}
         </>}
         {step === 5 && <>
-          <Field label="Monthly Food & Dining Budget" field="food" />
-          <Field label="Monthly Grocery Budget" field="grocery" />
+          {renderField("Monthly Food & Dining Budget", "food", "0.00")}
+          {renderField("Monthly Grocery Budget", "grocery", "0.00")}
         </>}
         {step === 6 && (
           <div>
