@@ -333,7 +333,7 @@ const css = `
   tr:last-child td { border-bottom: none; }
   tr:hover td { background: rgba(255,255,255,0.02); }
   @media (max-width: 768px) {
-    .sidebar { position: fixed; left: -260px; top: 0; height: 100%; z-index: 200; transition: left 0.3s; }
+    .sidebar { left: -260px; transition: left 0.3s; }
     .sidebar.open { left: 0; }
     .main-content { margin-left: 0 !important; }
   }
@@ -395,6 +395,7 @@ export default function BudgetApp() {
   const [uploadDrag, setUploadDrag] = useState(false);
   const [sortCol, setSortCol] = useState("date");
   const [sortDir, setSortDir] = useState("desc");
+  const [chartMode, setChartMode] = useState("bar"); // "bar" | "sankey"
   const [notification, setNotification] = useState(null);
   const [modal, setModal] = useState(null);
   const fileRef = useRef();
@@ -414,7 +415,12 @@ export default function BudgetApp() {
             sb.getAll("custom_keywords"),
           ]);
           if (txns.length) setTransactions(migrateCategories(txns));
-          if (cats.length) setCategories(cats);
+          if (cats.length) {
+            // Merge loaded cats with defaults — add any new default cats not in DB
+            const loadedIds = new Set(cats.map(c => c.id));
+            const missingDefaults = DEFAULT_CATEGORIES.filter(c => !loadedIds.has(c.id));
+            setCategories([...cats, ...missingDefaults]);
+          }
           if (bls.length) setBills(bls);
           if (sched.length) setSchedule(sched);
           if (kwds.length) setCustomKeywords(kwds);
@@ -700,7 +706,7 @@ export default function BudgetApp() {
       {sidebarOpen && <div onClick={() => setSidebarOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 199 }} />}
 
       {/* Sidebar */}
-      <aside className={`sidebar ${sidebarOpen ? "open" : ""}`} style={{ width: 220, background: T.card, borderRight: `1px solid ${T.border}`, display: "flex", flexDirection: "column", padding: "24px 12px", gap: 4, flexShrink: 0 }}>
+      <aside className={`sidebar ${sidebarOpen ? "open" : ""}`} style={{ width: 244, background: T.card, borderRight: `1px solid ${T.border}`, display: "flex", flexDirection: "column", padding: "24px 12px", gap: 4, flexShrink: 0, position: "fixed", top: 0, left: 0, height: "100vh", overflowY: "auto", zIndex: 100 }}>
         <div style={{ padding: "0 8px 20px", borderBottom: `1px solid ${T.border}`, marginBottom: 8 }}>
           <div style={{ fontFamily: "Syne", fontSize: 20, fontWeight: 800, color: T.text }}>
             <span style={{ color: T.teal }}>$</span>mart<span style={{ color: T.coral }}>Budget</span>
@@ -768,7 +774,7 @@ export default function BudgetApp() {
       </aside>
 
       {/* Main */}
-      <main className="main-content" style={{ flex: 1, padding: "24px", overflowY: "auto", marginLeft: 0 }}>
+      <main className="main-content" style={{ flex: 1, padding: "24px", overflowY: "auto", marginLeft: 244, minHeight: "100vh" }}>
         {/* Mobile header */}
         <div style={{ display: "none" }} className="mobile-header">
           <button onClick={() => setSidebarOpen(true)} style={{ background: "none", border: "none", color: T.text, cursor: "pointer" }}>☰</button>
@@ -818,25 +824,84 @@ export default function BudgetApp() {
 
                 {/* Bar */}
                 <div className="card">
-                  <div style={{ fontFamily: "Syne", fontWeight: 600, marginBottom: 16 }}>Income vs Expenses</div>
-                  {monthlyData.some(m => m.income > 0 || m.expenses > 0) ? (
-                    <ResponsiveContainer width="100%" height={260}>
-                      <BarChart data={monthlyData.map(m => ({ ...m, expensesNeg: -m.expenses }))} barGap={2} barCategoryGap="25%">
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
-                        <XAxis dataKey="label" tick={{ fontSize: 11, fill: T.muted }} axisLine={false} tickLine={false} />
-                        <YAxis tick={{ fontSize: 11, fill: T.muted }} axisLine={false} tickLine={false}
-                          tickFormatter={v => `$${Math.abs(v/1000).toFixed(1)}k`} />
-                        <Tooltip
-                          formatter={(v, name) => [fmt(Math.abs(v)), name]}
-                          contentStyle={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 8, color: T.text, fontSize: 13 }} />
-                        <ReferenceLine y={0} stroke="rgba(255,255,255,0.2)" strokeWidth={1.5} />
-                        <Bar dataKey="income" fill="#A78BFA" radius={[4, 4, 0, 0]} name="Income" />
-                        <Bar dataKey="expensesNeg" fill="#4ADE80" radius={[0, 0, 4, 4]} name="Expenses" />
-                        <Legend formatter={(v) => v === "expensesNeg" ? "Expenses" : v}
-                          wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ) : <div style={{ color: T.muted, fontSize: 13, textAlign: "center", padding: 40 }}>Upload transactions to see monthly trends</div>}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                    <div style={{ fontFamily: "Syne", fontWeight: 600 }}>
+                      {chartMode === "bar" ? "Income vs Expenses" : "Expense Flow"}
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      {[{ id: "bar", label: "📊 Bar" }, { id: "sankey", label: "🌊 Sankey" }].map(m => (
+                        <button key={m.id} onClick={() => setChartMode(m.id)}
+                          style={{ fontSize: 11, padding: "4px 10px", borderRadius: 8, cursor: "pointer", fontFamily: "DM Sans",
+                            background: chartMode === m.id ? T.teal : "rgba(255,255,255,0.05)",
+                            color: chartMode === m.id ? "#0a0a1a" : T.muted,
+                            border: `1px solid ${chartMode === m.id ? T.teal : T.border}` }}>
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {chartMode === "bar" && (
+                    monthlyData.some(m => m.income > 0 || m.expenses > 0) ? (
+                      <ResponsiveContainer width="100%" height={260}>
+                        <BarChart data={monthlyData.map(m => ({ ...m, expensesNeg: -m.expenses }))} barGap={2} barCategoryGap="25%">
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+                          <XAxis dataKey="label" tick={{ fontSize: 11, fill: T.muted }} axisLine={false} tickLine={false} />
+                          <YAxis tick={{ fontSize: 11, fill: T.muted }} axisLine={false} tickLine={false}
+                            tickFormatter={v => `$${Math.abs(v/1000).toFixed(1)}k`} />
+                          <Tooltip formatter={(v, name) => [fmt(Math.abs(v)), name]}
+                            contentStyle={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 8, color: T.text, fontSize: 13 }} />
+                          <ReferenceLine y={0} stroke="rgba(255,255,255,0.2)" strokeWidth={1.5} />
+                          <Bar dataKey="income" fill="#A78BFA" radius={[4, 4, 0, 0]} name="Income" />
+                          <Bar dataKey="expensesNeg" fill="#4ADE80" radius={[0, 0, 4, 4]} name="Expenses" />
+                          <Legend formatter={(v) => v === "expensesNeg" ? "Expenses" : v} wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : <div style={{ color: T.muted, fontSize: 13, textAlign: "center", padding: 40 }}>Upload transactions to see monthly trends</div>
+                  )}
+
+                  {chartMode === "sankey" && (() => {
+                    // Build Sankey: Income node → expense category nodes
+                    const sankeyData = expenseByCategory.filter(c => c.value > 0).sort((a,b) => b.value - a.value).slice(0, 10);
+                    const totalFlow = sankeyData.reduce((s, c) => s + c.value, 0);
+                    if (totalFlow === 0) return <div style={{ color: T.muted, fontSize: 13, textAlign: "center", padding: 40 }}>No expense data for selected period</div>;
+                    const H = 300, W = 560, nodeW = 18, pad = 8, leftX = 20, rightX = W - nodeW - 20;
+                    // Position right nodes evenly
+                    const totalH = H - (sankeyData.length - 1) * pad;
+                    let rightY = 0;
+                    const nodes = sankeyData.map(c => {
+                      const h = Math.max(12, (c.value / totalFlow) * totalH);
+                      const y = rightY;
+                      rightY += h + pad;
+                      return { ...c, h, y };
+                    });
+                    return (
+                      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 300 }}>
+                        {/* Income source node */}
+                        <rect x={leftX} y={0} width={nodeW} height={H} rx={4} fill="#A78BFA" />
+                        <text x={leftX + nodeW + 6} y={H/2} fill={T.text} fontSize={11} dominantBaseline="middle" fontFamily="DM Sans">{fmt(totalFlow)}</text>
+                        <text x={leftX + nodeW + 6} y={H/2 - 14} fill={T.muted} fontSize={10} dominantBaseline="middle" fontFamily="DM Sans">Total Expenses</text>
+                        {/* Flow paths + destination nodes */}
+                        {nodes.map((c, i) => {
+                          const srcY0 = (c.y / (rightY - pad)) * H;
+                          const srcY1 = srcY0 + (c.h / (rightY - pad)) * H;
+                          const dstY0 = c.y * (H / (rightY - pad));
+                          const dstY1 = dstY0 + c.h * (H / (rightY - pad));
+                          const mx = (leftX + nodeW + rightX) / 2;
+                          const path = `M${leftX + nodeW},${srcY0} C${mx},${srcY0} ${mx},${dstY0} ${rightX},${dstY0} L${rightX},${dstY1} C${mx},${dstY1} ${mx},${srcY1} ${leftX+nodeW},${srcY1} Z`;
+                          return (
+                            <g key={c.name}>
+                              <path d={path} fill={c.color} opacity={0.35} />
+                              <rect x={rightX} y={dstY0} width={nodeW} height={Math.max(2, dstY1-dstY0)} rx={3} fill={c.color} />
+                              <text x={rightX + nodeW + 6} y={dstY0 + (dstY1-dstY0)/2} fill={T.text} fontSize={10} dominantBaseline="middle" fontFamily="DM Sans">
+                                {c.name} · {fmt(c.value)}
+                              </text>
+                            </g>
+                          );
+                        })}
+                      </svg>
+                    );
+                  })()}
                 </div>
 
                 {/* Line */}
