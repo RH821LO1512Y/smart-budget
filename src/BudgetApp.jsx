@@ -1541,15 +1541,16 @@ function SetupWizard({ categories, setCategories, setCustomKeywords, onComplete 
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-      {/* Progress bar */}
-      <div style={{ marginBottom: 20 }}>
+      {/* Progress bar — sticky so it never scrolls away */}
+      <div style={{ position: "sticky", top: 0, zIndex: 10, background: T.card, paddingBottom: 16, marginBottom: 4 }}>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-          <span style={{ fontSize: 11, color: T.muted }}>Step {step + 1} of {WIZARD_STEPS.length}</span>
-          <span style={{ fontSize: 11, color: T.teal }}>{pct}% complete</span>
+          <span style={{ fontFamily: "Syne", fontSize: 15, fontWeight: 700 }}>{s.title}</span>
+          <span style={{ fontSize: 12, color: T.teal }}>{step + 1} / {WIZARD_STEPS.length}</span>
         </div>
         <div className="progress-bar" style={{ height: 6 }}>
           <div className="progress-fill" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${T.teal}, #A78BFA)`, transition: "width 0.4s ease" }} />
         </div>
+        <div style={{ fontSize: 11, color: T.muted, marginTop: 4 }}>{pct}% complete</div>
       </div>
 
       {/* Step subtitle */}
@@ -1784,13 +1785,13 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && close()}>
       <div className={`modal ${(modal.type === "categoryDrilldown" || modal.type === "setupWizard") ? "wide" : ""}`}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <div style={{ fontFamily: "Syne", fontSize: 18, fontWeight: 700 }}>
+          <div style={{ fontFamily: "Syne", fontSize: 18, fontWeight: 700, flex: 1, marginRight: 12 }}>
             {modal.type === "categoryDrilldown" ? (
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{ width: 12, height: 12, borderRadius: "50%", background: modal.cat?.color }} />
                 {modal.cat?.name}
               </div>
-            ) : titles[modal.type]}
+            ) : modal.type === "setupWizard" ? null : titles[modal.type]}
           </div>
           <button style={{ background: "none", border: "none", color: T.muted, cursor: "pointer" }} onClick={close}><X size={20} /></button>
         </div>
@@ -1882,9 +1883,7 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
 
           {modal.type === "columnMapper" && <ColumnMapper modal={modal} categories={categories} customKeywords={customKeywords} setTransactions={setTransactions} notify={notify} close={close} guessCategory={guessCategory} />}
           {modal.type === "categoryDrilldown" && <CategoryDrilldown modal={modal} categories={categories} transactions={transactions} setTransactions={setTransactions} dbStatus={dbStatus} notify={notify} close={close} />}
-          {modal.type === "setupWizard" && <SetupWizard categories={categories} setCategories={setCategories} setCustomKeywords={setCustomKeywords} onComplete={() => { localStorage.setItem("smartbudget_setup_done","1"); setSetupComplete(true); close(); notify("Setup complete! 🎉"); }} />}
-          {modal.type === "setupWizard" && <SetupWizard categories={categories} setCategories={setCategories} setCustomKeywords={setCustomKeywords} onComplete={() => { localStorage.setItem("smartbudget_setup_done","1"); setSetupComplete(true); close(); notify("Setup complete! 🎉"); }} />}
-          {modal.type === "setupWizard" && <SetupWizard categories={categories} setCategories={setCategories} setCustomKeywords={setCustomKeywords} onComplete={() => { localStorage.setItem("smartbudget_setup_done","1"); setSetupComplete(true); close(); notify("Setup complete! 🎉"); }} />}
+{modal.type === "setupWizard" && <SetupWizard categories={categories} setCategories={setCategories} setCustomKeywords={setCustomKeywords} onComplete={() => { localStorage.setItem("smartbudget_setup_done","1"); setSetupComplete(true); close(); notify("Setup complete! 🎉"); }} />}
 
           {(modal.type === "addSavingsGoal" || modal.type === "editSavingsGoal") && <>
             <input className="input" placeholder="Goal name (e.g. Emergency Fund)" defaultValue={modal.goal?.name || ""}
