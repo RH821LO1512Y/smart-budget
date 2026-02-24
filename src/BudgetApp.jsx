@@ -876,7 +876,7 @@ export default function BudgetApp() {
                 </div>
 
                 {/* Line */}
-                <div className="card" style={{ gridColumn: "1 / -1" }}>
+                <div className="card">
                   <div style={{ fontFamily: "Syne", fontWeight: 600, marginBottom: 16 }}>Savings Trend</div>
                   {savingsLine.length > 0 ? (
                     <ResponsiveContainer width="100%" height={180}>
@@ -898,7 +898,7 @@ export default function BudgetApp() {
                 </div>
 
                 {/* Bar */}
-                <div className="card">
+                <div className="card" style={{ gridColumn: "1 / -1" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
                     <div style={{ fontFamily: "Syne", fontWeight: 600 }}>
                       {chartMode === "bar" ? "Income vs Expenses" : "Expense Flow"}
