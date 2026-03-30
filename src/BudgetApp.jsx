@@ -860,7 +860,12 @@ export default function BudgetApp() {
                         <Pie data={expenseByCategory} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3} dataKey="value">
                           {expenseByCategory.map((e, i) => <Cell key={i} fill={e.color} />)}
                         </Pie>
-                        <Tooltip formatter={(v) => fmt(v)} contentStyle={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 8, color: T.text, fontSize: 13 }} />
+                        <Tooltip
+                          formatter={(v, name) => [fmt(v), name]}
+                          contentStyle={{ background: "#0D0C1D", border: `1px solid ${T.teal}`, borderRadius: 10, padding: "8px 14px", fontFamily: "DM Sans" }}
+                          itemStyle={{ color: T.teal, fontWeight: 600, fontSize: 13 }}
+                          labelStyle={{ color: "#ffffff", fontWeight: 600, fontSize: 13 }}
+                        />
                       </PieChart>
                     </ResponsiveContainer>
                   ) : <div style={{ color: T.muted, fontSize: 13, textAlign: "center", padding: 40 }}>No expense data yet</div>}
