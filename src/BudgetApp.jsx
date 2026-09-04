@@ -167,7 +167,6 @@ const DEFAULT_KEYWORDS = [
   { id: "kw_mailmeteor", keyword: "mailmeteor",        categoryId: "work"          },
   { id: "kw_ANTHROPIC",  keyword: "ANTHROPIC",         categoryId: "work"          },
 ];
-
 // ── Bank CSV presets ─────────────────────────────────────────────────────────
 const BANK_PRESETS = {
   bofa: {
@@ -996,13 +995,17 @@ export default function BudgetApp() {
   ]);
   const [loading, setLoading] = useState(true);
 
-  // Clear all data when user changes (login/logout)
+  // Clear all data only when a DIFFERENT user logs in (not on page refresh)
+  const prevUserIdRef = useRef(null);
   useEffect(() => {
-    if (user) {
+    const newId = user?.id || null;
+    if (newId && prevUserIdRef.current && prevUserIdRef.current !== newId) {
+      // Different user — wipe state so previous user's data doesn't flash
       setTransactions([]); setCategories([]); setBills([]);
       setSchedule([]); setCustomKeywords(DEFAULT_KEYWORDS); setSavingsGoals([]);
-      setDbStatus("checking"); setLoading(true);
+      setDbStatus("checking");
     }
+    prevUserIdRef.current = newId;
   }, [user?.id]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [uploadDrag, setUploadDrag] = useState(false);
@@ -1031,7 +1034,7 @@ export default function BudgetApp() {
   // Load data — Supabase if configured, otherwise localStorage
   useEffect(() => {
     (async () => {
-      if (isSupabaseReady()) {
+      if (isSupabaseReady() && user) {
         try {
           const [txns, cats, bls, sched, kwds] = await Promise.all([
             sb.getAll("transactions"),
@@ -1082,7 +1085,7 @@ export default function BudgetApp() {
       }
       setLoading(false);
     })();
-  }, []);
+  }, [user?.id, dbStatus]);
 
   // Launch setup wizard on first visit
   useEffect(() => {
