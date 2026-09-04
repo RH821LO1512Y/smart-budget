@@ -969,6 +969,8 @@ function AuthScreen({ onAuth }) {
 }
 
 export default function BudgetApp() {
+  const [user, setUser] = useState(auth.getSession()?.user || null);
+  const [authScreen, setAuthScreen] = useState(!auth.getSession() ? "login" : null); // "login"|"signup"|null
   const [tab, setTab] = useState("dashboard");
   const [transactions, setTransactions] = useState([]);
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
@@ -1031,8 +1033,6 @@ export default function BudgetApp() {
   const fileRef = useRef();
 
   const [dbStatus, setDbStatus] = useState("checking"); // "checking" | "connected" | "local"
-  const [user, setUser] = useState(auth.getSession()?.user || null);
-  const [authScreen, setAuthScreen] = useState(!auth.getSession() ? "login" : null); // "login"|"signup"|null
 
   // Load data — Supabase if configured, otherwise localStorage
   useEffect(() => {
