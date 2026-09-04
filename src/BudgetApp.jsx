@@ -36,7 +36,7 @@ const DEFAULT_CATEGORIES = [
   { id: "income",       name: "Income",          color: "#6BCB77", budget: 0,    type: "income"   },
   { id: "savings",      name: "Savings",          color: "#FCD34D", budget: 500,  type: "savings"  },
   // ── Housing ───────────────────────────────────────────────────
-  { id: "housing",      name: "Rent",             color: "#A78BFA", budget: 1500, type: "expense"  },
+  { id: "housing",      name: "Rent/Mortgage",             color: "#A78BFA", budget: 1500, type: "expense"  },
   // ── Food ──────────────────────────────────────────────────────
   { id: "food",         name: "Food & Dining",    color: "#4ECDC4", budget: 600,  type: "expense"  },
   { id: "grocery",      name: "Grocery",          color: "#34D399", budget: 400,  type: "expense"  },
@@ -46,14 +46,14 @@ const DEFAULT_CATEGORIES = [
   { id: "utilities",    name: "Utilities",        color: "#60A5FA", budget: 250,  type: "expense"  },
   // ── Health ────────────────────────────────────────────────────
   { id: "health_ins",   name: "Health Insurance", color: "#6BCB77", budget: 300,  type: "expense"  },
-  { id: "healthcare",   name: "Healthcare",       color: "#F87171", budget: 200,  type: "expense"  },
+  { id: "health_exp",   name: "Health Expenses (medication, supplies)",       color: "#F87171", budget: 200,  type: "expense"  },
   // ── Debt & Credit ─────────────────────────────────────────────
   { id: "credit_cards", name: "Credit Cards",     color: "#3B82F6", budget: 400,  type: "expense"  },
   { id: "loans_debt",   name: "Loans & Debt",     color: "#F59E0B", budget: 500,  type: "expense"  },
   // ── Lifestyle ─────────────────────────────────────────────────
   { id: "personal_care",name: "Personal Care",    color: "#F472B6", budget: 150,  type: "expense"  },
   { id: "entertainment",name: "Entertainment",    color: "#A78BFA", budget: 150,  type: "expense"  },
-  { id: "baby",         name: "Baby",             color: "#FDE68A", budget: 150,  type: "expense"  },
+  { id: "children",         name: "Children",             color: "#FDE68A", budget: 150,  type: "expense"  },
   { id: "pets",         name: "Pets",             color: "#A3E635", budget: 100,  type: "expense"  },
   { id: "contribution", name: "Contribution",     color: "#C4B5FD", budget: 100,  type: "expense"  },
   { id: "notary",       name: "Notary",           color: "#94A3B8", budget: 0,    type: "expense"  },
@@ -116,7 +116,7 @@ const DEFAULT_KEYWORDS = [
   { id: "kw_spectrum",   keyword: "spectrum",          categoryId: "utilities"     },
   { id: "kw_verizon",    keyword: "verizon",           categoryId: "utilities"     },
   // Health Insurance (separate)
-  { id: "kw_aetna",      keyword: "aetna",             categoryId: "health_ins"    },
+  { id: "kw_BCBS",      keyword: "BCBS",             categoryId: "health_ins"    },
   { id: "kw_ambetter",   keyword: "ambetter",          categoryId: "health_ins"    },
   { id: "kw_guardian",   keyword: "guardian",          categoryId: "health_ins"    },
   // Healthcare (dental + medical)
@@ -147,10 +147,8 @@ const DEFAULT_KEYWORDS = [
   { id: "kw_disney",     keyword: "disney+",           categoryId: "entertainment" },
   { id: "kw_sub",        keyword: "subscription",      categoryId: "entertainment" },
   { id: "kw_movie",      keyword: "movie",             categoryId: "entertainment" },
-  // Baby
-  { id: "kw_carters",    keyword: "carters",           categoryId: "baby"          },
   // Pets
-  { id: "kw_rainwalk",   keyword: "rainwalk",          categoryId: "pets"          },
+  { id: "kw_BARKSUDS",   keyword: "BARKSUDS",          categoryId: "pets"          },
   { id: "kw_petco",      keyword: "petco",             categoryId: "pets"          },
   { id: "kw_petsmart",   keyword: "petsmart",          categoryId: "pets"          },
   // Contribution
@@ -167,6 +165,7 @@ const DEFAULT_KEYWORDS = [
   { id: "kw_hotel",      keyword: "hotel",             categoryId: "travel"        },
   // Work
   { id: "kw_mailmeteor", keyword: "mailmeteor",        categoryId: "work"          },
+  { id: "kw_ANTHROPIC",  keyword: "ANTHROPIC",         categoryId: "work"          },
 ];
 
 // ── Bank CSV presets ─────────────────────────────────────────────────────────
