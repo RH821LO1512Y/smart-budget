@@ -1667,18 +1667,44 @@ function CategoryDrilldown({ modal, categories, transactions, setTransactions, d
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       {/* Summary bar */}
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <div style={{ flex: 1, background: `${cat.color}12`, border: `1px solid ${cat.color}30`, borderRadius: 10, padding: "10px 14px" }}>
-          <div style={{ fontSize: 11, color: T.muted }}>Transactions in {monthLabel}</div>
-          <div style={{ fontFamily: "Syne", fontSize: 20, fontWeight: 700, color: cat.color }}>{catTxns.length}</div>
-        </div>
-        <div style={{ flex: 1, background: `${cat.color}12`, border: `1px solid ${cat.color}30`, borderRadius: 10, padding: "10px 14px" }}>
-          <div style={{ fontSize: 11, color: T.muted }}>Total Spent in {monthLabel}</div>
-          <div style={{ fontFamily: "Syne", fontSize: 20, fontWeight: 700, color: cat.color }}>
-            {fmt(Math.abs(catTxns.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0)))}
+      {(() => {
+        const isIncome = cat.type === "income";
+        const isSavings = cat.type === "savings";
+        const totalIn  = catTxns.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
+        const totalOut = catTxns.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
+        const net = totalIn - totalOut;
+        return (
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ flex: 1, background: `${cat.color}12`, border: `1px solid ${cat.color}30`, borderRadius: 10, padding: "10px 14px" }}>
+              <div style={{ fontSize: 11, color: T.muted }}>Transactions in {monthLabel}</div>
+              <div style={{ fontFamily: "Syne", fontSize: 20, fontWeight: 700, color: cat.color }}>{catTxns.length}</div>
+            </div>
+            {isIncome || isSavings ? (
+              <>
+                <div style={{ flex: 1, background: `${cat.color}12`, border: `1px solid ${cat.color}30`, borderRadius: 10, padding: "10px 14px" }}>
+                  <div style={{ fontSize: 11, color: T.muted }}>Total {isIncome ? "Income" : "Deposited"} in {monthLabel}</div>
+                  <div style={{ fontFamily: "Syne", fontSize: 20, fontWeight: 700, color: "#4ADE80" }}>{fmt(totalIn)}</div>
+                </div>
+                {totalOut > 0 && (
+                  <div style={{ flex: 1, background: "rgba(248,113,113,0.07)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 10, padding: "10px 14px" }}>
+                    <div style={{ fontSize: 11, color: T.muted }}>Total Withdrawn in {monthLabel}</div>
+                    <div style={{ fontFamily: "Syne", fontSize: 20, fontWeight: 700, color: "#F87171" }}>{fmt(totalOut)}</div>
+                  </div>
+                )}
+                <div style={{ flex: 1, background: `${net >= 0 ? "#4ADE80" : "#F87171"}12`, border: `1px solid ${net >= 0 ? "#4ADE80" : "#F87171"}30`, borderRadius: 10, padding: "10px 14px" }}>
+                  <div style={{ fontSize: 11, color: T.muted }}>Net in {monthLabel}</div>
+                  <div style={{ fontFamily: "Syne", fontSize: 20, fontWeight: 700, color: net >= 0 ? "#4ADE80" : "#F87171" }}>{net >= 0 ? "+" : ""}{fmt(net)}</div>
+                </div>
+              </>
+            ) : (
+              <div style={{ flex: 1, background: `${cat.color}12`, border: `1px solid ${cat.color}30`, borderRadius: 10, padding: "10px 14px" }}>
+                <div style={{ fontSize: 11, color: T.muted }}>Total Spent in {monthLabel}</div>
+                <div style={{ fontFamily: "Syne", fontSize: 20, fontWeight: 700, color: cat.color }}>{fmt(totalOut)}</div>
+              </div>
+            )}
           </div>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* Search */}
       <input
