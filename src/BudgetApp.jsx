@@ -692,6 +692,7 @@ export default function BudgetApp() {
   const netBalance = totalIncome - totalExpense;
   const savings = monthTxns.filter(t => { const c = categories.find(c => c.id === t.categoryId); return c?.type === "savings" && t.amount < 0; }).reduce((s, t) => s + Math.abs(t.amount), 0);
 
+  const sortedCategories = [...categories].sort((a, b) => a.name.localeCompare(b.name));
   const expenseByCategory = categories.filter(c => c.type === "expense").map(c => ({
     name: c.name,
     value: Math.abs(monthTxns.filter(t => t.categoryId === c.id && t.amount < 0).reduce((s, t) => s + t.amount, 0)),
@@ -1143,7 +1144,7 @@ export default function BudgetApp() {
                                 value={t.categoryId || ""}
                                 onChange={e => setTransactions(prev => prev.map(x => x.id === t.id ? { ...x, categoryId: e.target.value } : x))}>
                                 <option value="">— Uncategorized —</option>
-                                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                {sortedCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                               </select>
                             </td>
                             <td style={{ textAlign: "right", fontWeight: 600, color: t.amount >= 0 ? T.green : T.coral, whiteSpace: "nowrap" }}>
@@ -1221,13 +1222,17 @@ export default function BudgetApp() {
                 <Plus size={15} /> Add Category
               </button>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
-              {categories.filter(cat => cat.type !== "savings").map(cat => {
-                const catTxns = transactions.filter(t => t.categoryId === cat.id);
+            {(() => {
+              const incomeCats = sortedCategories.filter(cat => cat.type === "income" || cat.type === "savings");
+              const expenseCats = sortedCategories.filter(cat => cat.type === "expense");
+              const renderCard = (cat) => {
                 const catMonthTxns = monthTxns.filter(t => t.categoryId === cat.id);
-                const spent = Math.abs(catMonthTxns.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0));
+                const isIncome = cat.type === "income" || cat.type === "savings";
+                const spent = isIncome
+                  ? catMonthTxns.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0)
+                  : Math.abs(catMonthTxns.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0));
                 const pct = cat.budget > 0 ? Math.min((spent / cat.budget) * 100, 100) : 0;
-                const over = cat.budget > 0 && spent > cat.budget;
+                const over = !isIncome && cat.budget > 0 && spent > cat.budget;
                 const txnCount = catMonthTxns.length;
                 return (
                   <div key={cat.id} className="card" style={{ position: "relative", cursor: txnCount > 0 ? "pointer" : "default", transition: "border-color 0.2s", borderColor: T.border }}
@@ -1257,7 +1262,9 @@ export default function BudgetApp() {
                       </div>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                      <span style={{ fontSize: 13, color: T.muted }}>Spent this period</span>
+                      <span style={{ fontSize: 13, color: T.muted }}>
+                        {isIncome ? (cat.type === "savings" ? "Saved this period" : "Received this period") : "Spent this period"}
+                      </span>
                       <span style={{ fontSize: 13, color: over ? T.coral : T.text }}>{fmt(spent)} {cat.budget > 0 && `/ ${fmt(cat.budget)}`}</span>
                     </div>
                     {cat.budget > 0 && (
@@ -1276,8 +1283,24 @@ export default function BudgetApp() {
                     )}
                   </div>
                 );
-              })}
-            </div>
+              };
+              return (
+                <>
+                  {incomeCats.length > 0 && (
+                    <>
+                      <div style={{ fontFamily: "Syne", fontWeight: 600, fontSize: 13, color: T.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 }}>💰 Income &amp; Savings</div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14, marginBottom: 28 }}>
+                        {incomeCats.map(renderCard)}
+                      </div>
+                    </>
+                  )}
+                  <div style={{ fontFamily: "Syne", fontWeight: 600, fontSize: 13, color: T.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 }}>💸 Expenses</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
+                    {expenseCats.map(renderCard)}
+                  </div>
+                </>
+              );
+            })()}
 
             {/* ── Keyword Manager ── */}
             <div style={{ marginTop: 32 }}>
@@ -1745,7 +1768,7 @@ function CategoryDrilldown({ modal, categories, transactions, setTransactions, d
                       style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${T.border}`, borderRadius: 8, padding: "4px 8px", color: T.text, fontSize: 12, outline: "none", cursor: "pointer" }}
                       value={t.categoryId || ""}
                       onChange={e => recat(t.id, e.target.value)}>
-                      {categories.map(c => <option key={c.id} value={c.id} style={{ background: T.card }}>{c.name}</option>)}
+                      {sortedCategories.map(c => <option key={c.id} value={c.id} style={{ background: T.card }}>{c.name}</option>)}
                     </select>
                   </td>
                   <td style={{ padding: "10px 14px", textAlign: "right", fontWeight: 600, fontSize: 13, color: t.amount >= 0 ? T.green : T.coral, whiteSpace: "nowrap" }}>
@@ -2223,7 +2246,7 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
             <input className="input" type="number" min="1" max="31" placeholder="Due day of month (1-31)" onChange={e => set("dueDay", e.target.value)} />
             <select className="input" onChange={e => set("categoryId", e.target.value)}>
               <option value="">Select category</option>
-              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {sortedCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </>}
 
@@ -2246,7 +2269,7 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
             <input className="input" type="number" placeholder="Amount (negative for expense, e.g. -45.00)" onChange={e => set("amount", e.target.value)} />
             <select className="input" onChange={e => set("categoryId", e.target.value)}>
               <option value="">Select category</option>
-              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {sortedCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             <input className="input" placeholder="Note (optional)" onChange={e => set("note", e.target.value)} />
           </>}
@@ -2258,7 +2281,7 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
             <input className="input" placeholder='Keyword (e.g. "Netflix", "H-E-B", "Shell")' onChange={e => set("keyword", e.target.value)} />
             <select className="input" onChange={e => set("categoryId", e.target.value)}>
               <option value="">Select category</option>
-              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {sortedCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             <div style={{ fontSize: 12, color: T.muted }}>
               💡 Tip: Keywords are not case-sensitive. "starbucks" matches "STARBUCKS", "Starbucks", etc.
