@@ -4,7 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, ReferenceLine,
   LineChart, Line, Area, AreaChart
 } from "recharts";
-import { Upload, DollarSign, TrendingUp, TrendingDown, CreditCard, Calendar, Tag, CheckCircle, Circle, Plus, Trash2, X, ChevronLeft, ChevronRight, ArrowRight, AlertCircle, PiggyBank, Target, Edit2 } from "lucide-react";
+import { Upload, DollarSign, TrendingUp, TrendingDown, CreditCard, Calendar, Tag, CheckCircle, Circle, Plus, Trash2, X, ChevronLeft, ChevronRight, ArrowRight, AlertCircle, PiggyBank, Target, Edit2, Layers, LogOut, UserCircle } from "lucide-react";
 
 // ─── Google Fonts ─────────────────────────────────────────────────────────────
 const fontLink = document.createElement("link");
@@ -265,36 +265,93 @@ const SUPABASE_URL = "https://mlsnwxuyvfzqqextcems.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_Wof2d5MpMxvckU7gNOyP0g_9YhCvf6T";
 
 // Lightweight Supabase REST helper (no npm package needed)
+// ── Auth helpers ─────────────────────────────────────────────────────────────
+const AUTH_URL = `${SUPABASE_URL}/auth/v1`;
+let _session = JSON.parse(localStorage.getItem("sb_session") || "null");
+
+const auth = {
+  getSession: () => _session,
+  getToken: () => _session?.access_token || SUPABASE_ANON_KEY,
+  getUserId: () => _session?.user?.id || null,
+
+  async signUp(email, password) {
+    const res = await fetch(`${AUTH_URL}/signup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+    if (data.access_token) { _session = data; localStorage.setItem("sb_session", JSON.stringify(data)); }
+    return { ok: res.ok, data, error: data.error || data.msg || null };
+  },
+
+  async signIn(email, password) {
+    const res = await fetch(`${AUTH_URL}/token?grant_type=password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+    if (data.access_token) { _session = data; localStorage.setItem("sb_session", JSON.stringify(data)); }
+    return { ok: res.ok, data, error: data.error_description || data.error || null };
+  },
+
+  async signOut() {
+    await fetch(`${AUTH_URL}/logout`, {
+      method: "POST",
+      headers: { "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${auth.getToken()}` },
+    }).catch(() => {});
+    _session = null;
+    localStorage.removeItem("sb_session");
+  },
+
+  async refresh() {
+    if (!_session?.refresh_token) return false;
+    const res = await fetch(`${AUTH_URL}/token?grant_type=refresh_token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
+      body: JSON.stringify({ refresh_token: _session.refresh_token }),
+    });
+    if (res.ok) { _session = await res.json(); localStorage.setItem("sb_session", JSON.stringify(_session)); return true; }
+    _session = null; localStorage.removeItem("sb_session"); return false;
+  },
+};
+
+// ── Data helpers (all scoped to current user via RLS) ─────────────────────────
 const sb = {
-  headers: {
+  headers: () => ({
     "Content-Type": "application/json",
     "apikey": SUPABASE_ANON_KEY,
-    "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+    "Authorization": `Bearer ${auth.getToken()}`,
     "Prefer": "return=representation",
-  },
+  }),
   url: (table, query = "") => `${SUPABASE_URL}/rest/v1/${table}${query}`,
 
   async getAll(table) {
-    const res = await fetch(sb.url(table, "?order=created_at.asc"), { headers: sb.headers });
+    const res = await fetch(sb.url(table, "?order=created_at.asc"), { headers: sb.headers() });
+    if (res.status === 401) { await auth.refresh(); }
     if (!res.ok) return [];
     return res.json();
   },
 
   async upsert(table, row) {
+    const userId = auth.getUserId();
     const res = await fetch(sb.url(table), {
       method: "POST",
-      headers: { ...sb.headers, "Prefer": "resolution=merge-duplicates,return=representation" },
-      body: JSON.stringify(row),
+      headers: { ...sb.headers(), "Prefer": "resolution=merge-duplicates,return=representation" },
+      body: JSON.stringify(userId ? { ...row, user_id: userId } : row),
     });
     return res.ok;
   },
 
   async upsertMany(table, rows) {
     if (!rows.length) return;
+    const userId = auth.getUserId();
+    const stamped = userId ? rows.map(r => ({ ...r, user_id: userId })) : rows;
     const res = await fetch(sb.url(table), {
       method: "POST",
-      headers: { ...sb.headers, "Prefer": "resolution=merge-duplicates,return=representation" },
-      body: JSON.stringify(rows),
+      headers: { ...sb.headers(), "Prefer": "resolution=merge-duplicates,return=representation" },
+      body: JSON.stringify(stamped),
     });
     return res.ok;
   },
@@ -302,7 +359,7 @@ const sb = {
   async remove(table, id) {
     const res = await fetch(sb.url(table, `?id=eq.${id}`), {
       method: "DELETE",
-      headers: sb.headers,
+      headers: sb.headers(),
     });
     return res.ok;
   },
@@ -310,7 +367,7 @@ const sb = {
   async update(table, id, patch) {
     const res = await fetch(sb.url(table, `?id=eq.${id}`), {
       method: "PATCH",
-      headers: sb.headers,
+      headers: sb.headers(),
       body: JSON.stringify(patch),
     });
     return res.ok;
@@ -369,10 +426,51 @@ const css = `
   td { padding: 12px 14px; font-size: 14px; border-bottom: 1px solid rgba(42,40,80,0.5); vertical-align: middle; }
   tr:last-child td { border-bottom: none; }
   tr:hover td { background: rgba(255,255,255,0.02); }
+  /* ── Responsive breakpoints ──────────────────────────────────────── */
+
+  /* Large desktop (1600px+): wider sidebar, more padding */
+  @media (min-width: 1600px) {
+    .main-content { padding: 32px 48px !important; }
+    .card { padding: 24px; }
+    .modal { max-width: 560px; }
+    .modal.wide { max-width: 860px; }
+  }
+
+  /* Standard desktop (1024–1599px): default styles apply */
+
+  /* Small laptop / large tablet landscape (768–1023px): narrow sidebar */
+  @media (max-width: 1023px) and (min-width: 769px) {
+    .sidebar { width: 200px !important; }
+    .main-content { margin-left: 200px !important; padding: 18px !important; }
+    .card { padding: 16px; }
+    .nav-item { padding: 9px 12px; font-size: 13px; }
+    .btn { padding: 7px 14px; font-size: 13px; }
+  }
+
+  /* Tablet portrait & mobile landscape (481–768px): icon-only sidebar */
   @media (max-width: 768px) {
-    .sidebar { left: -260px; transition: left 0.3s; }
+    .sidebar { left: -260px; transition: left 0.3s; width: 244px !important; }
     .sidebar.open { left: 0; }
-    .main-content { margin-left: 0 !important; }
+    .main-content { margin-left: 0 !important; padding: 14px !important; }
+    .card { padding: 14px; border-radius: 12px; }
+    .modal { padding: 20px; border-radius: 16px; }
+    .modal.wide { max-width: calc(100vw - 32px); }
+    .btn { padding: 7px 12px; font-size: 13px; }
+    th { font-size: 11px; padding: 8px 10px; }
+    td { font-size: 13px; padding: 10px 10px; }
+    .upload-zone { padding: 24px 16px; }
+    .mobile-header { display: flex !important; align-items: center; gap: 12px; margin-bottom: 16px; }
+  }
+
+  /* Small mobile (≤480px): single column everything */
+  @media (max-width: 480px) {
+    .main-content { padding: 10px !important; }
+    .card { padding: 12px; border-radius: 10px; }
+    .modal { padding: 16px; max-height: 95vh; }
+    .btn { padding: 6px 10px; font-size: 12px; gap: 4px; }
+    th { font-size: 10px; padding: 6px 8px; }
+    td { font-size: 12px; padding: 8px 8px; }
+    h1 { font-size: 20px !important; }
   }
 `;
 const StyleTag = () => <style dangerouslySetInnerHTML={{ __html: css }} />;
@@ -400,6 +498,476 @@ const CategoryBadge = ({ category }) => (
 );
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
+// ── Universal category templates (for new user onboarding) ──────────────────
+const CATEGORY_TEMPLATES = [
+  { group: "💰 Income",
+    items: [
+      { id: "income",       name: "Income",          color: "#6BCB77", budget: 0,    type: "income"  },
+      { id: "savings",      name: "Savings",          color: "#FCD34D", budget: 0,    type: "savings" },
+    ]
+  },
+  { group: "🏠 Housing",
+    items: [
+      { id: "housing",      name: "Rent / Mortgage",  color: "#A78BFA", budget: 0,    type: "expense" },
+      { id: "utilities",    name: "Utilities",         color: "#60A5FA", budget: 0,    type: "expense" },
+      { id: "internet",     name: "Internet / Wi-Fi",  color: "#34D399", budget: 0,    type: "expense" },
+      { id: "phone",        name: "Phone",             color: "#FCA5A5", budget: 0,    type: "expense" },
+    ]
+  },
+  { group: "🍔 Food",
+    items: [
+      { id: "food",         name: "Food & Dining",    color: "#4ECDC4", budget: 0,    type: "expense" },
+      { id: "grocery",      name: "Grocery",          color: "#34D399", budget: 0,    type: "expense" },
+      { id: "coffee",       name: "Coffee",            color: "#C4A882", budget: 0,    type: "expense" },
+    ]
+  },
+  { group: "🚗 Transport",
+    items: [
+      { id: "transport",    name: "Transportation",   color: "#FFE66D", budget: 0,    type: "expense" },
+      { id: "gas",          name: "Gas / Fuel",        color: "#FCA5A5", budget: 0,    type: "expense" },
+      { id: "car_payment",  name: "Car Payment",       color: "#F59E0B", budget: 0,    type: "expense" },
+      { id: "parking",      name: "Parking / Tolls",   color: "#94A3B8", budget: 0,    type: "expense" },
+    ]
+  },
+  { group: "❤️ Health",
+    items: [
+      { id: "health_ins",   name: "Health Insurance", color: "#6BCB77", budget: 0,    type: "expense" },
+      { id: "healthcare",   name: "Medical / Dental",  color: "#F87171", budget: 0,    type: "expense" },
+      { id: "pharmacy",     name: "Pharmacy",          color: "#A78BFA", budget: 0,    type: "expense" },
+      { id: "fitness",      name: "Fitness / Gym",     color: "#4ADE80", budget: 0,    type: "expense" },
+    ]
+  },
+  { group: "💳 Debt & Credit",
+    items: [
+      { id: "credit_cards", name: "Credit Cards",     color: "#3B82F6", budget: 0,    type: "expense" },
+      { id: "loans_debt",   name: "Loans",             color: "#F59E0B", budget: 0,    type: "expense" },
+      { id: "student_loan", name: "Student Loans",     color: "#60A5FA", budget: 0,    type: "expense" },
+    ]
+  },
+  { group: "✨ Lifestyle",
+    items: [
+      { id: "entertainment",name: "Entertainment",    color: "#A78BFA", budget: 0,    type: "expense" },
+      { id: "subscriptions",name: "Subscriptions",    color: "#F472B6", budget: 0,    type: "expense" },
+      { id: "shopping",     name: "Shopping",          color: "#FB923C", budget: 0,    type: "expense" },
+      { id: "personal_care",name: "Personal Care",    color: "#F472B6", budget: 0,    type: "expense" },
+      { id: "travel",       name: "Travel",            color: "#67E8F9", budget: 0,    type: "expense" },
+      { id: "pets",         name: "Pets",              color: "#A3E635", budget: 0,    type: "expense" },
+      { id: "kids",         name: "Kids / Baby",       color: "#FDE68A", budget: 0,    type: "expense" },
+      { id: "education",    name: "Education",         color: "#6BCB77", budget: 0,    type: "expense" },
+    ]
+  },
+  { group: "🙏 Giving",
+    items: [
+      { id: "charity",      name: "Charity / Donations",color: "#C4B5FD",budget: 0,  type: "expense" },
+      { id: "contribution", name: "Church / Tithe",    color: "#C4B5FD", budget: 0,    type: "expense" },
+    ]
+  },
+  { group: "💼 Work",
+    items: [
+      { id: "work",         name: "Work Expenses",     color: "#94A3B8", budget: 0,    type: "expense" },
+      { id: "notary",       name: "Notary",            color: "#94A3B8", budget: 0,    type: "expense" },
+      { id: "business",     name: "Business",          color: "#60A5FA", budget: 0,    type: "expense" },
+    ]
+  },
+  { group: "📦 Other",
+    items: [
+      { id: "other",        name: "Other",             color: "#8B86B0", budget: 0,    type: "expense" },
+    ]
+  },
+];
+
+// Always-included (can't be deselected)
+const REQUIRED_CAT_IDS = new Set(["income", "other"]);
+
+// ── Business category templates ───────────────────────────────────────────────
+const BUSINESS_CATEGORY_TEMPLATES = [
+  { group: "💵 Revenue",
+    items: [
+      { id: "biz_revenue",    name: "Revenue / Sales",    color: "#4ADE80", budget: 0, type: "income",  account: "business" },
+      { id: "biz_services",   name: "Services Income",    color: "#6BCB77", budget: 0, type: "income",  account: "business" },
+      { id: "biz_other_inc",  name: "Other Income",       color: "#A3E635", budget: 0, type: "income",  account: "business" },
+    ]
+  },
+  { group: "🏭 Cost of Goods",
+    items: [
+      { id: "biz_cogs",       name: "Cost of Goods Sold", color: "#F59E0B", budget: 0, type: "expense", account: "business" },
+      { id: "biz_inventory",  name: "Inventory",          color: "#FCA5A5", budget: 0, type: "expense", account: "business" },
+      { id: "biz_supplies",   name: "Supplies",           color: "#FDE68A", budget: 0, type: "expense", account: "business" },
+    ]
+  },
+  { group: "🏢 Operating Expenses",
+    items: [
+      { id: "biz_rent",       name: "Office / Space Rent",color: "#A78BFA", budget: 0, type: "expense", account: "business" },
+      { id: "biz_utilities",  name: "Utilities",          color: "#60A5FA", budget: 0, type: "expense", account: "business" },
+      { id: "biz_internet",   name: "Internet / Phone",   color: "#34D399", budget: 0, type: "expense", account: "business" },
+      { id: "biz_insurance",  name: "Business Insurance", color: "#F472B6", budget: 0, type: "expense", account: "business" },
+      { id: "biz_software",   name: "Software / Tools",   color: "#818CF8", budget: 0, type: "expense", account: "business" },
+      { id: "biz_equipment",  name: "Equipment",          color: "#94A3B8", budget: 0, type: "expense", account: "business" },
+    ]
+  },
+  { group: "👥 People",
+    items: [
+      { id: "biz_payroll",    name: "Payroll / Salaries", color: "#3B82F6", budget: 0, type: "expense", account: "business" },
+      { id: "biz_contractors",name: "Contractors / 1099", color: "#60A5FA", budget: 0, type: "expense", account: "business" },
+      { id: "biz_benefits",   name: "Benefits",           color: "#A78BFA", budget: 0, type: "expense", account: "business" },
+    ]
+  },
+  { group: "📣 Marketing & Sales",
+    items: [
+      { id: "biz_ads",        name: "Advertising / Ads",  color: "#FB923C", budget: 0, type: "expense", account: "business" },
+      { id: "biz_marketing",  name: "Marketing",          color: "#F59E0B", budget: 0, type: "expense", account: "business" },
+      { id: "biz_website",    name: "Website / Hosting",  color: "#34D399", budget: 0, type: "expense", account: "business" },
+    ]
+  },
+  { group: "✈️ Travel & Meals",
+    items: [
+      { id: "biz_travel",     name: "Business Travel",    color: "#67E8F9", budget: 0, type: "expense", account: "business" },
+      { id: "biz_meals",      name: "Meals & Entertainment",color: "#4ECDC4",budget: 0, type: "expense", account: "business" },
+    ]
+  },
+  { group: "⚖️ Professional",
+    items: [
+      { id: "biz_legal",      name: "Legal / Accounting", color: "#C4B5FD", budget: 0, type: "expense", account: "business" },
+      { id: "biz_consulting", name: "Consulting",         color: "#A78BFA", budget: 0, type: "expense", account: "business" },
+    ]
+  },
+  { group: "🏦 Finance & Tax",
+    items: [
+      { id: "biz_taxes",      name: "Taxes",              color: "#F87171", budget: 0, type: "expense", account: "business" },
+      { id: "biz_loans",      name: "Business Loans",     color: "#F59E0B", budget: 0, type: "expense", account: "business" },
+      { id: "biz_fees",       name: "Bank / Card Fees",   color: "#94A3B8", budget: 0, type: "expense", account: "business" },
+    ]
+  },
+  { group: "📦 Other",
+    items: [
+      { id: "biz_other",      name: "Other Business",     color: "#8B86B0", budget: 0, type: "expense", account: "business" },
+    ]
+  },
+];
+
+// ── Account Type Selection Screen ─────────────────────────────────────────────
+function AccountTypeScreen({ onConfirm }) {
+  const [selected, setSelected] = useState(null);
+  const options = [
+    {
+      id: "personal",
+      emoji: "🏠",
+      title: "Personal",
+      desc: "Track household income, bills, and everyday spending.",
+      color: T.teal,
+    },
+    {
+      id: "business",
+      emoji: "💼",
+      title: "Business",
+      desc: "Track revenue, expenses, payroll, and P&L for your business.",
+      color: "#A78BFA",
+    },
+    {
+      id: "both",
+      emoji: "⚡",
+      title: "Both",
+      desc: "I'm an entrepreneur — I want to track personal and business finances together.",
+      color: "#F59E0B",
+    },
+  ];
+
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
+      background: T.bg, padding: 20 }}>
+      <div style={{ width: "100%", maxWidth: 500 }}>
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <div style={{ fontFamily: "Syne", fontSize: 28, fontWeight: 800, marginBottom: 8 }}>
+            <span style={{ color: T.teal }}>$</span><span style={{ color: T.text }}>mart</span><span style={{ color: "#A78BFA" }}>Budget</span>
+          </div>
+          <div style={{ fontFamily: "Syne", fontSize: 20, fontWeight: 700, marginBottom: 8, color: T.text }}>How will you use this?</div>
+          <div style={{ color: T.muted, fontSize: 14 }}>You can always change this later in settings.</div>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
+          {options.map(opt => (
+            <button key={opt.id} onClick={() => setSelected(opt.id)}
+              style={{
+                display: "flex", alignItems: "flex-start", gap: 16, padding: "18px 20px",
+                borderRadius: 14, cursor: "pointer", textAlign: "left", width: "100%",
+                background: selected === opt.id ? `${opt.color}12` : "rgba(255,255,255,0.03)",
+                border: `2px solid ${selected === opt.id ? opt.color : T.border}`,
+                transition: "all 0.2s",
+              }}>
+              <span style={{ fontSize: 28, lineHeight: 1 }}>{opt.emoji}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: "Syne", fontWeight: 700, fontSize: 16, color: selected === opt.id ? opt.color : T.text, marginBottom: 4 }}>
+                  {opt.title}
+                </div>
+                <div style={{ fontSize: 13, color: T.muted, lineHeight: 1.5 }}>{opt.desc}</div>
+              </div>
+              <div style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${selected === opt.id ? opt.color : T.border}`,
+                background: selected === opt.id ? opt.color : "transparent", flexShrink: 0, marginTop: 2,
+                display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {selected === opt.id && <div style={{ width: 8, height: 8, borderRadius: "50%", background: T.bg }} />}
+              </div>
+            </button>
+          ))}
+        </div>
+
+        <button onClick={() => selected && onConfirm(selected)} disabled={!selected}
+          style={{ width: "100%", padding: "14px 0", borderRadius: 12, border: "none", cursor: selected ? "pointer" : "not-allowed",
+            background: selected ? (options.find(o => o.id === selected)?.color || T.teal) : "rgba(255,255,255,0.08)",
+            color: selected ? T.bg : T.muted, fontFamily: "DM Sans", fontSize: 15, fontWeight: 600,
+            transition: "all 0.2s", opacity: selected ? 1 : 0.5 }}>
+          Continue →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CategoryPicker({ accountType = "personal", onConfirm }) {
+  // Default: pre-select the most common ones
+  // Determine which template sets to show
+  const isBoth = accountType === "both";
+  const isBiz  = accountType === "business";
+  const personalTemplates = isBiz ? [] : CATEGORY_TEMPLATES;
+  const bizTemplates      = (isBiz || isBoth) ? BUSINESS_CATEGORY_TEMPLATES : [];
+
+  const DEFAULT_PERSONAL = new Set([
+    "income","savings","housing","utilities","food","grocery",
+    "transport","health_ins","healthcare","credit_cards","entertainment",
+    "shopping","personal_care","other"
+  ]);
+  const DEFAULT_BIZ = new Set([
+    "biz_revenue","biz_services","biz_rent","biz_utilities","biz_software",
+    "biz_payroll","biz_ads","biz_taxes","biz_legal","biz_other"
+  ]);
+  const initialSelected = new Set([
+    ...(isBiz ? [] : DEFAULT_PERSONAL),
+    ...((isBiz || isBoth) ? DEFAULT_BIZ : []),
+  ]);
+  const [selected, setSelected] = useState(initialSelected);
+  const [pickerTab, setPickerTab] = useState(isBiz ? "business" : "personal");
+
+  const allTemplates = [...personalTemplates, ...bizTemplates];
+
+  const toggle = (id) => {
+    if (REQUIRED_CAT_IDS.has(id)) return;
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const selectAll = () => {
+    const all = new Set();
+    allTemplates.forEach(g => g.items.forEach(c => all.add(c.id)));
+    setSelected(all);
+  };
+
+  const selectNone = () => setSelected(new Set(REQUIRED_CAT_IDS));
+
+  const handleConfirm = () => {
+    const chosen = allTemplates
+      .flatMap(g => g.items)
+      .filter(c => selected.has(c.id))
+      .map(c => ({ ...c, account: c.account || "personal" }));
+    onConfirm(chosen);
+  };
+
+  const activeTemplates = pickerTab === "business" ? bizTemplates : personalTemplates;
+  const totalAll = allTemplates.reduce((s, g) => s + g.items.length, 0);
+
+  return (
+    <div style={{ minHeight: "100vh", background: T.bg, color: T.text, overflowY: "auto" }}>
+      <div style={{ maxWidth: 720, margin: "0 auto", padding: "40px 20px 100px" }}>
+        {/* Header */}
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <div style={{ fontFamily: "Syne", fontSize: 28, fontWeight: 800, marginBottom: 8 }}>
+            <span style={{ color: T.teal }}>$</span><span>mart</span><span style={{ color: "#A78BFA" }}>Budget</span>
+          </div>
+          <div style={{ fontFamily: "Syne", fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Choose your categories</div>
+          <div style={{ color: T.muted, fontSize: 14, lineHeight: 1.6, maxWidth: 480, margin: "0 auto" }}>
+            Select the spending categories that match your life. You can always add, remove, or rename them later.
+          </div>
+        </div>
+
+        {/* Tabs for "both" mode */}
+        {isBoth && (
+          <div style={{ display: "flex", gap: 0, marginBottom: 24, background: "rgba(255,255,255,0.04)", borderRadius: 10, padding: 3, maxWidth: 320, margin: "0 auto 24px" }}>
+            {[{id:"personal",label:"🏠 Personal"},{id:"business",label:"💼 Business"}].map(t => (
+              <button key={t.id} onClick={() => setPickerTab(t.id)}
+                style={{ flex: 1, padding: "8px 0", border: "none", borderRadius: 8, cursor: "pointer",
+                  fontFamily: "DM Sans", fontSize: 13, fontWeight: 500, transition: "all 0.2s",
+                  background: pickerTab === t.id ? (t.id === "business" ? "#A78BFA" : T.teal) : "transparent",
+                  color: pickerTab === t.id ? T.bg : T.muted }}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Quick actions */}
+        <div style={{ display: "flex", gap: 8, justifyContent: "center", marginBottom: 28 }}>
+          <button onClick={selectAll}
+            style={{ padding: "6px 16px", borderRadius: 20, fontSize: 13, cursor: "pointer", fontFamily: "DM Sans",
+              background: "rgba(255,255,255,0.06)", color: T.muted, border: `1px solid ${T.border}` }}>
+            Select all ({totalAll})
+          </button>
+          <button onClick={selectNone}
+            style={{ padding: "6px 16px", borderRadius: 20, fontSize: 13, cursor: "pointer", fontFamily: "DM Sans",
+              background: "rgba(255,255,255,0.06)", color: T.muted, border: `1px solid ${T.border}` }}>
+            Start fresh
+          </button>
+        </div>
+
+        {/* Category groups */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+          {activeTemplates.map(group => (
+            <div key={group.group}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: T.muted, textTransform: "uppercase",
+                letterSpacing: 1, marginBottom: 10, fontFamily: "Syne" }}>
+                {group.group}
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {group.items.map(cat => {
+                  const on = selected.has(cat.id);
+                  const required = REQUIRED_CAT_IDS.has(cat.id);
+                  return (
+                    <button key={cat.id} onClick={() => toggle(cat.id)}
+                      title={required ? "Always included" : ""}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 7,
+                        padding: "7px 14px", borderRadius: 24, cursor: required ? "default" : "pointer",
+                        fontFamily: "DM Sans", fontSize: 13, fontWeight: 500,
+                        border: `1.5px solid ${on ? cat.color : T.border}`,
+                        background: on ? `${cat.color}18` : "rgba(255,255,255,0.03)",
+                        color: on ? T.text : T.muted,
+                        transition: "all 0.15s",
+                        opacity: required ? 0.75 : 1,
+                      }}>
+                      <span style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0, display: "inline-block",
+                        background: on ? cat.color : "transparent",
+                        border: `2px solid ${on ? cat.color : T.border}`,
+                        transition: "all 0.15s" }} />
+                      {cat.name}
+                      {required && <span style={{ fontSize: 10, color: T.muted }}>✦</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Sticky confirm bar */}
+        <div style={{ position: "fixed", bottom: 0, left: 0, right: 0,
+          background: `linear-gradient(transparent, ${T.bg} 30%)`, padding: "24px 20px 20px",
+          display: "flex", justifyContent: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16, background: T.card,
+            border: `1px solid ${T.border}`, borderRadius: 16, padding: "12px 20px",
+            boxShadow: "0 -8px 32px rgba(0,0,0,0.4)" }}>
+            <span style={{ fontSize: 13, color: T.muted }}>{selected.size} categories selected</span>
+            <button onClick={handleConfirm}
+              style={{ padding: "10px 28px", borderRadius: 10, background: T.teal, color: T.bg,
+                border: "none", cursor: "pointer", fontFamily: "DM Sans", fontSize: 14, fontWeight: 600 }}>
+              Get Started →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AuthScreen({ onAuth }) {
+  const [mode, setMode] = useState("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
+
+  const submit = async () => {
+    setError(null); setSuccess(null);
+    if (!email || !password) { setError("Please fill in all fields."); return; }
+    if (mode === "signup" && password !== confirm) { setError("Passwords don't match."); return; }
+    if (password.length < 6) { setError("Password must be at least 6 characters."); return; }
+    setLoading(true);
+    const result = mode === "login" ? await auth.signIn(email, password) : await auth.signUp(email, password);
+    setLoading(false);
+    if (result.error) { setError(result.error); return; }
+    if (mode === "signup" && !result.data.access_token) {
+      setSuccess("Check your email for a confirmation link, then log in.");
+      setMode("login"); return;
+    }
+    onAuth(result.data.user);
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
+      background: T.bg, padding: 20 }}>
+      <div style={{ width: "100%", maxWidth: 400, background: T.card, border: `1px solid ${T.border}`,
+        borderRadius: 20, padding: 32 }}>
+        <div style={{ textAlign: "center", marginBottom: 28 }}>
+          <div style={{ fontFamily: "Syne", fontSize: 28, fontWeight: 800, marginBottom: 6 }}>
+            <span style={{ color: T.teal }}>$</span><span style={{ color: T.text }}>mart</span><span style={{ color: "#A78BFA" }}>Budget</span>
+          </div>
+          <div style={{ color: T.muted, fontSize: 14 }}>{mode === "login" ? "Sign in to your account" : "Create your account"}</div>
+        </div>
+
+        <div style={{ display: "flex", gap: 0, marginBottom: 24, background: "rgba(255,255,255,0.04)", borderRadius: 10, padding: 3 }}>
+          {["login","signup"].map(m => (
+            <button key={m} onClick={() => { setMode(m); setError(null); setSuccess(null); }}
+              style={{ flex: 1, padding: "8px 0", border: "none", borderRadius: 8, cursor: "pointer", fontFamily: "DM Sans",
+                fontSize: 14, fontWeight: 500, transition: "all 0.2s",
+                background: mode === m ? T.teal : "transparent",
+                color: mode === m ? T.bg : T.muted }}>
+              {m === "login" ? "Sign In" : "Sign Up"}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 12, color: T.muted, marginBottom: 5 }}>Email</div>
+            <input className="input" type="email" placeholder="you@email.com"
+              value={email} onChange={e => setEmail(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && submit()} />
+          </div>
+          <div>
+            <div style={{ fontSize: 12, color: T.muted, marginBottom: 5 }}>Password</div>
+            <input className="input" type="password" placeholder="Min. 6 characters"
+              value={password} onChange={e => setPassword(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && submit()} />
+          </div>
+          {mode === "signup" && (
+            <div>
+              <div style={{ fontSize: 12, color: T.muted, marginBottom: 5 }}>Confirm Password</div>
+              <input className="input" type="password" placeholder="Repeat password"
+                value={confirm} onChange={e => setConfirm(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && submit()} />
+            </div>
+          )}
+          {error && <div style={{ fontSize: 13, color: T.coral, background: "rgba(255,107,107,0.1)", padding: "8px 12px", borderRadius: 8 }}>{error}</div>}
+          {success && <div style={{ fontSize: 13, color: "#4ADE80", background: "rgba(74,222,128,0.1)", padding: "8px 12px", borderRadius: 8 }}>{success}</div>}
+          <button className="btn btn-primary" onClick={submit} disabled={loading}
+            style={{ width: "100%", justifyContent: "center", marginTop: 4, opacity: loading ? 0.7 : 1 }}>
+            {loading ? "Please wait..." : mode === "login" ? "Sign In" : "Create Account"}
+          </button>
+        </div>
+
+        <div style={{ marginTop: 20, textAlign: "center", fontSize: 13, color: T.muted }}>
+          {mode === "login" ? "Don't have an account? " : "Already have an account? "}
+          <button onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(null); }}
+            style={{ background: "none", border: "none", color: T.teal, cursor: "pointer", fontFamily: "DM Sans", fontSize: 13, fontWeight: 600 }}>
+            {mode === "login" ? "Sign up" : "Sign in"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function BudgetApp() {
   const [tab, setTab] = useState("dashboard");
   const [transactions, setTransactions] = useState([]);
@@ -428,6 +996,15 @@ export default function BudgetApp() {
     { id: "sg_vacation",  name: "Vacation",       targetAmount: 2000, color: "#67E8F9", emoji: "✈️", note: "Summer 2026" },
   ]);
   const [loading, setLoading] = useState(true);
+
+  // Clear all data when user changes (login/logout)
+  useEffect(() => {
+    if (user) {
+      setTransactions([]); setCategories([]); setBills([]);
+      setSchedule([]); setCustomKeywords(DEFAULT_KEYWORDS); setSavingsGoals([]);
+      setDbStatus("checking"); setLoading(true);
+    }
+  }, [user?.id]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [uploadDrag, setUploadDrag] = useState(false);
   const [sortCol, setSortCol] = useState("date");
@@ -435,11 +1012,22 @@ export default function BudgetApp() {
   const [txnPage, setTxnPage] = useState(0);
   const TXN_PAGE_SIZE = 100;
   const [sankeyExpanded, setSankeyExpanded] = useState(false);
+  const [compareMonths, setCompareMonths] = useState([]); // up to 3 "YYYY-MM" strings
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [showAccountTypeScreen, setShowAccountTypeScreen] = useState(false);
+  // "personal" | "business" | "both" — persisted per user in localStorage
+  const [accountType, setAccountType] = useState(() => {
+    const u = auth.getSession()?.user;
+    return u ? (localStorage.getItem(`smartbudget_acct_${u.id}`) || "personal") : "personal";
+  });
+  const [activeAccount, setActiveAccount] = useState("personal"); // current view filter
   const [notification, setNotification] = useState(null);
   const [modal, setModal] = useState(null);
   const fileRef = useRef();
 
   const [dbStatus, setDbStatus] = useState("checking"); // "checking" | "connected" | "local"
+  const [user, setUser] = useState(auth.getSession()?.user || null);
+  const [authScreen, setAuthScreen] = useState(!auth.getSession() ? "login" : null); // "login"|"signup"|null
 
   // Load data — Supabase if configured, otherwise localStorage
   useEffect(() => {
@@ -459,6 +1047,10 @@ export default function BudgetApp() {
             const loadedIds = new Set(cats.map(c => c.id));
             const missingDefaults = DEFAULT_CATEGORIES.filter(c => !loadedIds.has(c.id));
             setCategories([...cats, ...missingDefaults]);
+          } else {
+            // Brand new user — show account type screen first
+            setCategories([]);
+            setShowAccountTypeScreen(true);
           }
           if (bls.length) setBills(bls);
           if (sched.length) setSchedule(sched);
@@ -624,7 +1216,7 @@ export default function BudgetApp() {
               amount = c > 0 ? c : (d > 0 ? -d : 0);
             }
             const date = colMap.dateCol >= 0 ? cols[colMap.dateCol] : new Date().toISOString().split("T")[0];
-            parsedRows.push({ id: `t_${Date.now()}_${i}`, date, description: desc.trim(), amount, categoryId: guessCategory(desc, categories, customKeywords), note: "" });
+            parsedRows.push({ id: `t_${Date.now()}_${i}`, date, description: desc.trim(), amount, categoryId: guessCategory(desc, categories, customKeywords), note: "", account: activeAccount === "both" ? "personal" : activeAccount });
           });
         } else {
           const XLSX = window.XLSX;
@@ -637,7 +1229,7 @@ export default function BudgetApp() {
             const descKey = Object.keys(row).find(k => /\b(payee|merchant|description|narration|memo|particulars|reference|details)\b/i.test(k));
             const amtKey = Object.keys(row).find(k => /^(amount|transaction amount|amt)$/i.test(k));
             const desc = (descKey && String(row[descKey])) || `Transaction ${i + 1}`;
-            parsedRows.push({ id: `t_${Date.now()}_${i}`, date: (dateKey && row[dateKey]) || new Date().toISOString().split("T")[0], description: desc, amount: parseAmount(amtKey ? row[amtKey] : 0), categoryId: guessCategory(desc, categories, customKeywords), note: "" });
+            parsedRows.push({ id: `t_${Date.now()}_${i}`, date: (dateKey && row[dateKey]) || new Date().toISOString().split("T")[0], description: desc, amount: parseAmount(amtKey ? row[amtKey] : 0), categoryId: guessCategory(desc, categories, customKeywords), note: "", account: activeAccount === "both" ? "personal" : activeAccount });
           });
         }
 
@@ -680,6 +1272,11 @@ export default function BudgetApp() {
     if (!d) return false;
     if (rangeStart && d < rangeStart) return false;
     if (rangeEnd   && d > rangeEnd)   return false;
+    // Account filter
+    if (activeAccount !== "both") {
+      const tAcct = t.account || "personal";
+      if (tAcct !== activeAccount) return false;
+    }
     return true;
   });
   const rangeLabelShort = (() => {
@@ -692,7 +1289,9 @@ export default function BudgetApp() {
   const netBalance = totalIncome - totalExpense;
   const savings = monthTxns.filter(t => { const c = categories.find(c => c.id === t.categoryId); return c?.type === "savings" && t.amount < 0; }).reduce((s, t) => s + Math.abs(t.amount), 0);
 
-  const sortedCategories = [...categories].sort((a, b) => a.name.localeCompare(b.name));
+  const sortedCategories = [...categories]
+    .filter(c => activeAccount === "both" || (c.account || "personal") === activeAccount)
+    .sort((a, b) => a.name.localeCompare(b.name));
   const expenseByCategory = categories.filter(c => c.type === "expense").map(c => ({
     name: c.name,
     value: Math.abs(monthTxns.filter(t => t.categoryId === c.id && t.amount < 0).reduce((s, t) => s + t.amount, 0)),
@@ -739,6 +1338,7 @@ export default function BudgetApp() {
     { id: "savings",      icon: PiggyBank,  label: "Savings"      },
     { id: "bills",        icon: CreditCard, label: "Bills"        },
     { id: "schedule",     icon: Calendar,   label: "Schedule"     },
+    { id: "compare",      icon: Layers,     label: "Compare"      },
   ];
 
   if (loading) return (
@@ -746,6 +1346,47 @@ export default function BudgetApp() {
       <div style={{ fontFamily: "Syne", fontSize: 20, color: T.teal }} className="pulse">Loading your finances...</div>
     </div>
   );
+
+  if (authScreen || !user) {
+    return (
+      <>
+        <StyleTag />
+        <AuthScreen onAuth={(u) => { setUser(u); setAuthScreen(null); }} />
+      </>
+    );
+  }
+
+  if (showAccountTypeScreen) {
+    return (
+      <>
+        <StyleTag />
+        <AccountTypeScreen onConfirm={(type) => {
+          const uid = user?.id;
+          if (uid) localStorage.setItem(`smartbudget_acct_${uid}`, type);
+          setAccountType(type);
+          setActiveAccount("personal");
+          setShowAccountTypeScreen(false);
+          setShowCategoryPicker(true);
+        }} />
+      </>
+    );
+  }
+
+  if (showCategoryPicker) {
+    return (
+      <>
+        <StyleTag />
+        <CategoryPicker accountType={accountType} onConfirm={(chosen) => {
+          setCategories(chosen);
+          setShowCategoryPicker(false);
+          if (dbStatus === "connected") {
+            sb.upsertMany("categories", chosen).catch(() => {});
+          }
+          localStorage.removeItem("smartbudget_setup_done");
+        }} />
+      </>
+    );
+  }
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: T.bg, fontFamily: "'DM Sans', sans-serif" }}>
@@ -827,6 +1468,42 @@ export default function BudgetApp() {
             <div style={{ fontSize: 10, color: T.muted, marginTop: 4, lineHeight: 1.4 }}>Add your Supabase keys<br/>to sync across devices</div>
           )}
         </div>
+        {/* Account switcher — only shown for business/both users */}
+        {(accountType === "business" || accountType === "both") && (
+          <div style={{ margin: "12px 0", padding: "10px 8px", background: "rgba(255,255,255,0.04)", borderRadius: 10 }}>
+            <div style={{ fontSize: 10, color: T.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8, paddingLeft: 4 }}>Account View</div>
+            {(accountType === "both"
+              ? [{ id: "personal", label: "Personal", color: T.teal }, { id: "business", label: "Business", color: "#A78BFA" }, { id: "both", label: "Combined", color: "#F59E0B" }]
+              : [{ id: "personal", label: "Personal", color: T.teal }, { id: "business", label: "Business", color: "#A78BFA" }]
+            ).map(opt => (
+              <button key={opt.id} onClick={() => setActiveAccount(opt.id)}
+                style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "7px 10px",
+                  border: "none", borderRadius: 8, cursor: "pointer", fontFamily: "DM Sans", fontSize: 12, fontWeight: 500,
+                  background: activeAccount === opt.id ? `${opt.color}18` : "transparent",
+                  color: activeAccount === opt.id ? opt.color : T.muted,
+                  marginBottom: 2 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: opt.color, flexShrink: 0 }} />
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* User + logout */}
+        <div style={{ marginTop: "auto", paddingTop: 16, borderTop: `1px solid ${T.border}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", marginBottom: 6 }}>
+            <UserCircle size={18} style={{ color: T.teal, flexShrink: 0 }} />
+            <span style={{ fontSize: 12, color: T.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user?.email}</span>
+          </div>
+          <button className="nav-item" onClick={async () => {
+            await auth.signOut();
+            setUser(null);
+            setAuthScreen("login");
+          }} style={{ color: T.coral, gap: 10 }}>
+            <LogOut size={18} />
+            <span>Sign Out</span>
+          </button>
+        </div>
       </aside>
 
       {/* Main */}
@@ -845,7 +1522,7 @@ export default function BudgetApp() {
             </p>
 
             {/* Stat cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14, marginBottom: 24 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
               <StatCard label="Total Income" value={fmt(totalIncome)} icon={TrendingUp} color={T.green} sub="All deposits" />
               <StatCard label="Total Expenses" value={fmt(totalExpense)} icon={TrendingDown} color={T.coral} sub="All withdrawals" />
               <StatCard label="Net Balance" value={fmt(netBalance)} icon={DollarSign} color={netBalance >= 0 ? T.teal : T.coral} sub={netBalance >= 0 ? "Looking good!" : "Overspent"} />
@@ -854,7 +1531,7 @@ export default function BudgetApp() {
 
             {/* Charts */}
             {transactions.length > 0 ? (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))", gap: 16 }}>
 
                 {/* Pie — clickable → categories */}
                 <div className="card" onClick={() => setTab("categories")}
@@ -1136,7 +1813,14 @@ export default function BudgetApp() {
                           <tr key={t.id}>
                             <td style={{ color: T.muted, fontSize: 12, whiteSpace: "nowrap" }}>{t.date}</td>
                             <td style={{ maxWidth: 260 }}>
-                              <div style={{ fontWeight: 500, fontSize: 13, wordBreak: "break-word", lineHeight: 1.4 }}>{t.description}</div>
+                              <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
+                                {activeAccount === "both" && (
+                                  <span title={t.account === "business" ? "Business" : "Personal"}
+                                    style={{ marginTop: 3, width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+                                      background: t.account === "business" ? "#A78BFA" : T.teal }} />
+                                )}
+                                <div style={{ fontWeight: 500, fontSize: 13, wordBreak: "break-word", lineHeight: 1.4 }}>{t.description}</div>
+                              </div>
                               {t.note && <div style={{ fontSize: 11, color: T.muted }}>{t.note}</div>}
                             </td>
                             <td>
@@ -1289,13 +1973,13 @@ export default function BudgetApp() {
                   {incomeCats.length > 0 && (
                     <>
                       <div style={{ fontFamily: "Syne", fontWeight: 600, fontSize: 13, color: T.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 }}>💰 Income &amp; Savings</div>
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14, marginBottom: 28 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(280px, 100%), 1fr))", gap: 14, marginBottom: 28 }}>
                         {incomeCats.map(renderCard)}
                       </div>
                     </>
                   )}
                   <div style={{ fontFamily: "Syne", fontWeight: 600, fontSize: 13, color: T.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 }}>💸 Expenses</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(280px, 100%), 1fr))", gap: 14 }}>
                     {expenseCats.map(renderCard)}
                   </div>
                 </>
@@ -1645,6 +2329,224 @@ export default function BudgetApp() {
       </main>
 
       {/* ─ Modals ─ */}
+        {tab === "compare" && (
+          <div className="fade-in">
+            <h1 style={{ fontFamily: "Syne", fontSize: 26, fontWeight: 700, marginBottom: 4 }}>Month Comparison</h1>
+            <p style={{ color: T.muted, fontSize: 14, marginBottom: 24 }}>Select up to 3 months to compare spending side by side</p>
+
+            {/* Month picker */}
+            {(() => {
+              // Build list of all months that have transactions
+              const monthSet = new Set();
+              transactions.forEach(t => {
+                const d = parseDate(t.date);
+                if (d) monthSet.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`);
+              });
+              const availableMonths = [...monthSet].sort().reverse(); // newest first
+
+              const toggleMonth = (ym) => {
+                setCompareMonths(prev => {
+                  if (prev.includes(ym)) return prev.filter(m => m !== ym);
+                  if (prev.length >= 3) return [...prev.slice(1), ym];
+                  return [...prev, ym];
+                });
+              };
+
+              const fmtMonthLabel = (ym) => {
+                const [y, m] = ym.split("-");
+                return `${MONTHS[parseInt(m)-1]} '${y.slice(2)}`;
+              };
+
+              // For each selected month, get per-category totals
+              const getMonthTotals = (ym) => {
+                const [y, m] = ym.split("-").map(Number);
+                const txns = transactions.filter(t => {
+                  const d = parseDate(t.date);
+                  return d && d.getFullYear() === y && d.getMonth() + 1 === m;
+                });
+                const totals = {};
+                categories.forEach(c => { totals[c.id] = 0; });
+                txns.forEach(t => {
+                  if (t.categoryId && totals[t.categoryId] !== undefined) {
+                    totals[t.categoryId] += Math.abs(t.amount);
+                  }
+                });
+                const income = txns.filter(t => { const c = categories.find(c => c.id === t.categoryId); return c?.type === "income"; }).reduce((s,t) => s + Math.abs(t.amount), 0);
+                const expenses = txns.filter(t => { const c = categories.find(c => c.id === t.categoryId); return c?.type === "expense"; }).reduce((s,t) => s + Math.abs(t.amount), 0);
+                return { totals, income, expenses, net: income - expenses };
+              };
+
+              const selectedData = compareMonths.map(ym => ({ ym, label: fmtMonthLabel(ym), ...getMonthTotals(ym) }));
+              const MONTH_COLORS = ["#A78BFA", "#4ADE80", "#60A5FA"];
+
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                  {/* Month selector chips */}
+                  <div className="card">
+                    <div style={{ fontFamily: "Syne", fontWeight: 600, marginBottom: 12 }}>Select Months</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {availableMonths.length === 0 && (
+                        <div style={{ color: T.muted, fontSize: 13 }}>No transaction data yet — upload a bank statement first</div>
+                      )}
+                      {availableMonths.map(ym => {
+                        const idx = compareMonths.indexOf(ym);
+                        const selected = idx >= 0;
+                        const color = selected ? MONTH_COLORS[idx] : null;
+                        return (
+                          <button key={ym} onClick={() => toggleMonth(ym)}
+                            style={{ padding: "6px 14px", borderRadius: 20, fontSize: 13, cursor: "pointer", fontFamily: "DM Sans",
+                              background: selected ? `${color}20` : "rgba(255,255,255,0.05)",
+                              color: selected ? color : T.muted,
+                              border: `1.5px solid ${selected ? color : T.border}`,
+                              fontWeight: selected ? 600 : 400 }}>
+                            {selected && <span style={{ marginRight: 6 }}>●</span>}{fmtMonthLabel(ym)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {compareMonths.length > 0 && (
+                      <button onClick={() => setCompareMonths([])}
+                        style={{ marginTop: 12, fontSize: 12, color: T.muted, background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
+                        Clear selection
+                      </button>
+                    )}
+                  </div>
+
+                  {selectedData.length >= 1 && (
+                    <>
+                      {/* Summary row */}
+                      <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(selectedData.length, window.innerWidth < 640 ? 1 : selectedData.length)}, 1fr)`, gap: 14 }}>
+                        {selectedData.map((m, i) => (
+                          <div key={m.ym} className="card" style={{ borderColor: MONTH_COLORS[i], borderWidth: 2 }}>
+                            <div style={{ fontFamily: "Syne", fontWeight: 700, fontSize: 16, color: MONTH_COLORS[i], marginBottom: 12 }}>{m.label}</div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                <span style={{ fontSize: 13, color: T.muted }}>Income</span>
+                                <span style={{ fontSize: 13, color: "#4ADE80", fontWeight: 600 }}>{fmt(m.income)}</span>
+                              </div>
+                              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                <span style={{ fontSize: 13, color: T.muted }}>Expenses</span>
+                                <span style={{ fontSize: 13, color: T.coral, fontWeight: 600 }}>{fmt(m.expenses)}</span>
+                              </div>
+                              <div style={{ height: 1, background: T.border, margin: "4px 0" }} />
+                              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                <span style={{ fontSize: 13, color: T.muted }}>Net</span>
+                                <span style={{ fontSize: 13, color: m.net >= 0 ? "#4ADE80" : T.coral, fontWeight: 700 }}>{m.net >= 0 ? "+" : ""}{fmt(m.net)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Category breakdown bar chart */}
+                      <div className="card">
+                        <div style={{ fontFamily: "Syne", fontWeight: 600, marginBottom: 20 }}>Spending by Category</div>
+                        {(() => {
+                          const expCats = [...categories]
+                            .filter(c => c.type === "expense")
+                            .filter(c => selectedData.some(m => m.totals[c.id] > 0))
+                            .sort((a, b) => {
+                              const maxA = Math.max(...selectedData.map(m => m.totals[a.id] || 0));
+                              const maxB = Math.max(...selectedData.map(m => m.totals[b.id] || 0));
+                              return maxB - maxA;
+                            });
+                          const maxVal = Math.max(...expCats.flatMap(c => selectedData.map(m => m.totals[c.id] || 0)));
+                          if (expCats.length === 0) return <div style={{ color: T.muted, fontSize: 13, textAlign: "center", padding: 20 }}>No expense data for selected months</div>;
+                          return (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                              {/* Legend */}
+                              <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 4 }}>
+                                {selectedData.map((m, i) => (
+                                  <div key={m.ym} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                    <div style={{ width: 12, height: 12, borderRadius: 3, background: MONTH_COLORS[i] }} />
+                                    <span style={{ fontSize: 12, color: T.muted }}>{m.label}</span>
+                                  </div>
+                                ))}
+                              </div>
+                              {expCats.map(cat => (
+                                <div key={cat.id} style={{ display: "grid", gridTemplateColumns: "clamp(90px, 20%, 140px) 1fr", alignItems: "center", gap: 12 }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                    <span style={{ width: 8, height: 8, borderRadius: 2, background: cat.color, flexShrink: 0, display: "inline-block" }} />
+                                    <span style={{ fontSize: 12, fontWeight: 500, color: T.text }}>{cat.name}</span>
+                                  </div>
+                                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                                    {selectedData.map((m, i) => {
+                                      const val = m.totals[cat.id] || 0;
+                                      const pct = maxVal > 0 ? (val / maxVal) * 100 : 0;
+                                      return (
+                                        <div key={m.ym} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                          <div style={{ flex: 1, height: 16, background: "rgba(255,255,255,0.05)", borderRadius: 4, overflow: "hidden" }}>
+                                            <div style={{ width: `${pct}%`, height: "100%", background: MONTH_COLORS[i], borderRadius: 4, transition: "width 0.5s ease", opacity: 0.85 }} />
+                                          </div>
+                                          <span style={{ fontSize: 11, color: val > 0 ? T.text : T.muted, minWidth: 70, textAlign: "right" }}>{val > 0 ? fmt(val) : "—"}</span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </div>
+
+                      {/* Month-over-month delta table (if 2+ months) */}
+                      {selectedData.length >= 2 && (
+                        <div className="card">
+                          <div style={{ fontFamily: "Syne", fontWeight: 600, marginBottom: 16 }}>Month-over-Month Changes</div>
+                          <div style={{ overflowX: "auto" }}>
+                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                              <thead>
+                                <tr style={{ borderBottom: `1px solid ${T.border}` }}>
+                                  <th style={{ padding: "8px 12px", textAlign: "left", color: T.muted, fontWeight: 500 }}>Category</th>
+                                  {selectedData.map(m => <th key={m.ym} style={{ padding: "8px 12px", textAlign: "right", color: T.muted, fontWeight: 500 }}>{m.label}</th>)}
+                                  {selectedData.length === 2 && <th style={{ padding: "8px 12px", textAlign: "right", color: T.muted, fontWeight: 500 }}>Change</th>}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {[...categories]
+                                  .filter(c => c.type === "expense" && selectedData.some(m => m.totals[c.id] > 0))
+                                  .sort((a,b) => a.name.localeCompare(b.name))
+                                  .map(cat => {
+                                    const vals = selectedData.map(m => m.totals[cat.id] || 0);
+                                    const delta = selectedData.length === 2 ? vals[1] - vals[0] : null;
+                                    return (
+                                      <tr key={cat.id} style={{ borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
+                                        <td style={{ padding: "8px 12px", display: "flex", alignItems: "center", gap: 6 }}>
+                                          <span style={{ width: 8, height: 8, borderRadius: 2, background: cat.color, display: "inline-block" }} />
+                                          {cat.name}
+                                        </td>
+                                        {vals.map((v, i) => <td key={i} style={{ padding: "8px 12px", textAlign: "right" }}>{v > 0 ? fmt(v) : <span style={{ color: T.muted }}>—</span>}</td>)}
+                                        {delta !== null && (
+                                          <td style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, color: delta > 0 ? T.coral : delta < 0 ? "#4ADE80" : T.muted }}>
+                                            {delta === 0 ? "—" : `${delta > 0 ? "+" : ""}${fmt(delta)}`}
+                                          </td>
+                                        )}
+                                      </tr>
+                                    );
+                                  })}
+                                <tr style={{ borderTop: `1px solid ${T.border}`, fontWeight: 700 }}>
+                                  <td style={{ padding: "10px 12px" }}>Total Expenses</td>
+                                  {selectedData.map((m, i) => <td key={i} style={{ padding: "10px 12px", textAlign: "right", color: T.coral }}>{fmt(m.expenses)}</td>)}
+                                  {selectedData.length === 2 && (() => {
+                                    const d = selectedData[1].expenses - selectedData[0].expenses;
+                                    return <td style={{ padding: "10px 12px", textAlign: "right", color: d > 0 ? T.coral : "#4ADE80" }}>{d >= 0 ? "+" : ""}{fmt(d)}</td>;
+                                  })()}
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+
       {modal && <Modal modal={modal} setModal={setModal} categories={categories} setCategories={setCategories} bills={bills} setBills={setBills} schedule={schedule} setSchedule={setSchedule} transactions={transactions} setTransactions={setTransactions} customKeywords={customKeywords} setCustomKeywords={setCustomKeywords} savingsGoals={savingsGoals} setSavingsGoals={setSavingsGoals} dbStatus={dbStatus} notify={notify} guessCategory={guessCategory} />}
     </div>
   );
@@ -2160,7 +3062,7 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
       notify("Event scheduled!");
     } else if (modal.type === "addTransaction") {
       if (!form.description || !form.amount || !form.date) return;
-      setTransactions(prev => [{ id: `t_${Date.now()}`, date: form.date, description: form.description, amount: parseFloat(form.amount), categoryId: form.categoryId || "other", note: form.note || "" }, ...prev]);
+      setTransactions(prev => [{ id: `t_${Date.now()}`, date: form.date, description: form.description, amount: parseFloat(form.amount), categoryId: form.categoryId || "other", note: form.note || "", account: form.account || (activeAccount === "both" ? "personal" : activeAccount) }, ...prev]);
       notify("Transaction added!");
     } else if (modal.type === "addKeyword") {
       if (!form.keyword || !form.categoryId) return;
@@ -2272,6 +3174,12 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
               {sortedCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             <input className="input" placeholder="Note (optional)" onChange={e => set("note", e.target.value)} />
+            {(modal.accountType === "business" || modal.accountType === "both" || true) && (
+              <select className="input" onChange={e => set("account", e.target.value)}>
+                <option value="personal">🏠 Personal</option>
+                <option value="business">💼 Business</option>
+              </select>
+            )}
           </>}
 
           {modal.type === "addKeyword" && <>
