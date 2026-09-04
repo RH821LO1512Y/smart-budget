@@ -1135,7 +1135,7 @@ export default function BudgetApp() {
                           <tr key={t.id}>
                             <td style={{ color: T.muted, fontSize: 12, whiteSpace: "nowrap" }}>{t.date}</td>
                             <td style={{ maxWidth: 260 }}>
-                              <div style={{ fontWeight: 500, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 240 }} title={t.description}>{t.description}</div>
+                              <div style={{ fontWeight: 500, fontSize: 13, wordBreak: "break-word", lineHeight: 1.4 }}>{t.description}</div>
                               {t.note && <div style={{ fontSize: 11, color: T.muted }}>{t.note}</div>}
                             </td>
                             <td>
@@ -1512,7 +1512,7 @@ export default function BudgetApp() {
                               <tr key={t.id}>
                                 <td style={{ color: T.muted, fontSize: 12, whiteSpace: "nowrap" }}>{t.date}</td>
                                 <td style={{ fontSize: 13, fontWeight: 500, maxWidth: 260 }}>
-                                  <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={t.description}>{t.description}</div>
+                                  <div style={{ wordBreak: "break-word", lineHeight: 1.4 }}>{t.description}</div>
                                 </td>
                                 <td>
                                   <select
@@ -1710,7 +1710,7 @@ function CategoryDrilldown({ modal, categories, transactions, setTransactions, d
                 <tr key={t.id} style={{ borderBottom: i < catTxns.length - 1 ? `1px solid rgba(42,40,80,0.5)` : "none" }}>
                   <td style={{ padding: "10px 14px", fontSize: 12, color: T.muted, whiteSpace: "nowrap" }}>{t.date}</td>
                   <td style={{ padding: "10px 14px", maxWidth: 200 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={t.description}>
+                    <div style={{ fontSize: 13, fontWeight: 500, wordBreak: "break-word", lineHeight: 1.4 }}>
                       {t.description}
                     </div>
                   </td>
