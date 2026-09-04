@@ -267,7 +267,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_Wof2d5MpMxvckU7gNOyP0g_9YhCvf6T";
 // Lightweight Supabase REST helper (no npm package needed)
 // ── Auth helpers ─────────────────────────────────────────────────────────────
 const AUTH_URL = `${SUPABASE_URL}/auth/v1`;
-let _session = JSON.parse(localStorage.getItem("sb_session") || "null");
+let _session = (() => { try { return JSON.parse(localStorage.getItem("sb_session") || "null"); } catch(e) { localStorage.removeItem("sb_session"); return null; } })();
 
 const auth = {
   getSession: () => _session,
@@ -1005,7 +1005,6 @@ export default function BudgetApp() {
       // Different user — wipe state so previous user's data doesn't flash
       setTransactions([]); setCategories([]); setBills([]);
       setSchedule([]); setCustomKeywords(DEFAULT_KEYWORDS); setSavingsGoals([]);
-      setDbStatus("checking");
     }
     prevUserIdRef.current = newId;
   }, [user?.id]);
@@ -1021,8 +1020,10 @@ export default function BudgetApp() {
   const [showAccountTypeScreen, setShowAccountTypeScreen] = useState(false);
   // "personal" | "business" | "both" — persisted per user in localStorage
   const [accountType, setAccountType] = useState(() => {
-    const u = auth.getSession()?.user;
-    return u ? (localStorage.getItem(`smartbudget_acct_${u.id}`) || "personal") : "personal";
+    try {
+      const u = auth.getSession()?.user;
+      return u ? (localStorage.getItem(`smartbudget_acct_${u.id}`) || "personal") : "personal";
+    } catch(e) { return "personal"; }
   });
   const [activeAccount, setActiveAccount] = useState("personal"); // current view filter
   const [notification, setNotification] = useState(null);
@@ -1087,7 +1088,7 @@ export default function BudgetApp() {
       }
       setLoading(false);
     })();
-  }, [user?.id, dbStatus]);
+  }, [user?.id]);
 
   // Launch setup wizard on first visit
   useEffect(() => {
