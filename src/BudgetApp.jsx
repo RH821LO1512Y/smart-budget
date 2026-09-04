@@ -432,6 +432,9 @@ export default function BudgetApp() {
   const [uploadDrag, setUploadDrag] = useState(false);
   const [sortCol, setSortCol] = useState("date");
   const [sortDir, setSortDir] = useState("desc");
+  const [txnPage, setTxnPage] = useState(0);
+  const TXN_PAGE_SIZE = 100;
+  const [sankeyExpanded, setSankeyExpanded] = useState(false);
   const [notification, setNotification] = useState(null);
   const [modal, setModal] = useState(null);
   const fileRef = useRef();
@@ -850,10 +853,17 @@ export default function BudgetApp() {
 
             {/* Charts */}
             {transactions.length > 0 ? (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
-                {/* Pie */}
-                <div className="card">
-                  <div style={{ fontFamily: "Syne", fontWeight: 600, marginBottom: 16 }}>Spending by Category</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 16 }}>
+
+                {/* Pie — clickable → categories */}
+                <div className="card" onClick={() => setTab("categories")}
+                  style={{ cursor: "pointer", transition: "border-color 0.2s, transform 0.15s", borderColor: T.border }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = T.teal; e.currentTarget.style.transform = "translateY(-2px)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.transform = "translateY(0)"; }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                    <div style={{ fontFamily: "Syne", fontWeight: 600 }}>Spending by Category</div>
+                    <span style={{ fontSize: 11, color: T.teal, display: "flex", alignItems: "center", gap: 4 }}>View all <ArrowRight size={11} /></span>
+                  </div>
                   {expenseByCategory.length > 0 ? (
                     <ResponsiveContainer width="100%" height={220}>
                       <PieChart>
@@ -879,9 +889,15 @@ export default function BudgetApp() {
                   </div>
                 </div>
 
-                {/* Line */}
-                <div className="card">
-                  <div style={{ fontFamily: "Syne", fontWeight: 600, marginBottom: 16 }}>Savings Trend</div>
+                {/* Savings Trend — clickable → savings */}
+                <div className="card" onClick={() => setTab("savings")}
+                  style={{ cursor: "pointer", transition: "border-color 0.2s, transform 0.15s", borderColor: T.border }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = T.teal; e.currentTarget.style.transform = "translateY(-2px)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.transform = "translateY(0)"; }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                    <div style={{ fontFamily: "Syne", fontWeight: 600 }}>Savings Trend</div>
+                    <span style={{ fontSize: 11, color: T.teal, display: "flex", alignItems: "center", gap: 4 }}>View all <ArrowRight size={11} /></span>
+                  </div>
                   {savingsLine.length > 0 ? (
                     <ResponsiveContainer width="100%" height={180}>
                       <AreaChart data={savingsLine}>
@@ -901,9 +917,15 @@ export default function BudgetApp() {
                   ) : <div style={{ color: T.muted, fontSize: 13, textAlign: "center", padding: 40 }}>Savings data will appear here</div>}
                 </div>
 
-                {/* Bar — full width */}
-                <div className="card" style={{ gridColumn: "1 / -1" }}>
-                  <div style={{ fontFamily: "Syne", fontWeight: 600, marginBottom: 16 }}>Income vs Expenses</div>
+                {/* Income vs Expenses — full width, clickable → transactions */}
+                <div className="card" style={{ gridColumn: "1 / -1", cursor: "pointer", transition: "border-color 0.2s", borderColor: T.border }}
+                  onClick={() => setTab("transactions")}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = T.teal; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                    <div style={{ fontFamily: "Syne", fontWeight: 600 }}>Income vs Expenses</div>
+                    <span style={{ fontSize: 11, color: T.teal, display: "flex", alignItems: "center", gap: 4 }}>View transactions <ArrowRight size={11} /></span>
+                  </div>
                   {monthlyData.some(m => m.income > 0 || m.expenses > 0) ? (
                     <ResponsiveContainer width="100%" height={260}>
                       <BarChart data={monthlyData.map(m => ({ ...m, expensesNeg: -m.expenses }))} barGap={2} barCategoryGap="25%">
@@ -922,80 +944,104 @@ export default function BudgetApp() {
                   ) : <div style={{ color: T.muted, fontSize: 13, textAlign: "center", padding: 40 }}>Upload transactions to see monthly trends</div>}
                 </div>
 
-                {/* Sankey — full width, always visible */}
-                <div className="card" style={{ gridColumn: "1 / -1" }}>
-                  <div style={{ fontFamily: "Syne", fontWeight: 600, marginBottom: 16 }}>🌊 Expense Flow by Category</div>
+                {/* Sankey — full width, expandable */}
+                <div className="card" style={{ gridColumn: "1 / -1", transition: "all 0.3s ease" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, cursor: "pointer" }}
+                    onClick={() => setSankeyExpanded(e => !e)}>
+                    <div style={{ fontFamily: "Syne", fontWeight: 600 }}>🌊 Expense Flow by Category</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 11, color: T.muted }}>{sankeyExpanded ? "Click to collapse" : "Click to expand"}</span>
+                      <span style={{ fontSize: 16, color: T.teal, transition: "transform 0.3s", display: "inline-block", transform: sankeyExpanded ? "rotate(180deg)" : "rotate(0deg)" }}>⌃</span>
+                    </div>
+                  </div>
+
                   {(() => {
                     const sankeyData = expenseByCategory.filter(c => c.value > 0).sort((a,b) => b.value - a.value).slice(0, 12);
                     const totalFlow = sankeyData.reduce((s, c) => s + c.value, 0);
                     if (totalFlow === 0) return <div style={{ color: T.muted, fontSize: 13, textAlign: "center", padding: 40 }}>No expense data for selected period</div>;
 
-                    // Responsive SVG: use a wide viewBox with room for labels
-                    const H = 360, W = 900, nodeW = 20, pad = 6;
-                    const leftX = 10, leftW = 160; // left label area
-                    const rightX = W - 180, rightW = 20; // right node area
-                    const srcX = leftX + leftW;   // left node x
-                    const dstX = rightX;           // right node x
-
-                    // Scale node heights proportionally
+                    const H = sankeyExpanded ? 600 : 340;
+                    const W = 900, nodeW = 20, pad = sankeyExpanded ? 10 : 6;
+                    const srcX = 170, dstX = W - 200;
                     const totalH = H - (sankeyData.length - 1) * pad;
                     let srcY = 0;
                     const nodes = sankeyData.map(c => {
-                      const h = Math.max(14, (c.value / totalFlow) * totalH);
+                      const h = Math.max(sankeyExpanded ? 22 : 14, (c.value / totalFlow) * totalH);
                       const node = { ...c, h, srcY };
                       srcY += h + pad;
                       return node;
                     });
                     const totalSrcH = srcY - pad;
-
-                    // Center the source block vertically
                     const srcBlockH = Math.min(H, totalSrcH);
                     const srcOffY = Math.max(0, (H - srcBlockH) / 2);
-
-                    // Destination nodes: evenly spaced
-                    const dstPad = 6;
+                    const dstPad = pad;
                     const dstTotalH = H - (sankeyData.length - 1) * dstPad;
                     let dstY = 0;
                     const dstNodes = nodes.map(c => {
-                      const h = Math.max(14, (c.value / totalFlow) * dstTotalH);
+                      const h = Math.max(sankeyExpanded ? 22 : 14, (c.value / totalFlow) * dstTotalH);
                       const node = { ...c, dstY, dstH: h };
                       dstY += h + dstPad;
                       return node;
                     });
 
                     return (
-                      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 360, overflow: "visible" }}>
-                        {/* Source node (Total Expenses) */}
-                        <rect x={srcX} y={srcOffY} width={nodeW} height={srcBlockH} rx={4} fill="#A78BFA" />
-                        <text x={srcX - 8} y={srcOffY + srcBlockH / 2 - 8} textAnchor="end" fill={T.text} fontSize={12} fontWeight="600" fontFamily="DM Sans" dominantBaseline="middle">Total</text>
-                        <text x={srcX - 8} y={srcOffY + srcBlockH / 2 + 8} textAnchor="end" fill={T.teal} fontSize={11} fontFamily="DM Sans" dominantBaseline="middle">{fmt(totalFlow)}</text>
+                      <div>
+                        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: sankeyExpanded ? 600 : 340, overflow: "visible", transition: "height 0.3s ease" }}>
+                          <rect x={srcX} y={srcOffY} width={nodeW} height={srcBlockH} rx={4} fill="#A78BFA" />
+                          <text x={srcX - 8} y={srcOffY + srcBlockH / 2 - 9} textAnchor="end" fill={T.text} fontSize={12} fontWeight="600" fontFamily="DM Sans" dominantBaseline="middle">Total</text>
+                          <text x={srcX - 8} y={srcOffY + srcBlockH / 2 + 9} textAnchor="end" fill={T.teal} fontSize={11} fontFamily="DM Sans" dominantBaseline="middle">{fmt(totalFlow)}</text>
+                          {dstNodes.map((c) => {
+                            const pct = c.value / totalFlow;
+                            const sliceH = pct * srcBlockH;
+                            const sliceY = srcOffY + (c.srcY / totalSrcH) * srcBlockH;
+                            const s0 = sliceY, s1 = sliceY + sliceH;
+                            const d0 = c.dstY, d1 = c.dstY + c.dstH;
+                            const mx = (srcX + nodeW + dstX) / 2;
+                            const path = `M${srcX+nodeW},${s0} C${mx},${s0} ${mx},${d0} ${dstX},${d0} L${dstX},${d1} C${mx},${d1} ${mx},${s1} ${srcX+nodeW},${s1} Z`;
+                            return (
+                              <g key={c.name}>
+                                <path d={path} fill={c.color} opacity={0.28} />
+                                <rect x={dstX} y={d0} width={nodeW} height={Math.max(2, c.dstH)} rx={3} fill={c.color} />
+                                <circle cx={dstX + nodeW + 10} cy={d0 + c.dstH / 2} r={4} fill={c.color} />
+                                <text x={dstX + nodeW + 20} y={d0 + c.dstH / 2 - 7} fill={T.text} fontSize={sankeyExpanded ? 12 : 10} fontFamily="DM Sans" dominantBaseline="middle" fontWeight="500">{c.name}</text>
+                                <text x={dstX + nodeW + 20} y={d0 + c.dstH / 2 + 8} fill={T.muted} fontSize={sankeyExpanded ? 11 : 9} fontFamily="DM Sans" dominantBaseline="middle">{fmt(c.value)} · {(pct*100).toFixed(1)}%</text>
+                              </g>
+                            );
+                          })}
+                        </svg>
 
-                        {/* Flow ribbons + destination nodes */}
-                        {dstNodes.map((c) => {
-                          // Source slice on the left node
-                          const pct = c.value / totalFlow;
-                          const sliceH = pct * srcBlockH;
-                          // Calculate cumulative position on source node
-                          const sliceY = srcOffY + (c.srcY / totalSrcH) * srcBlockH;
-
-                          const s0 = sliceY, s1 = sliceY + sliceH;
-                          const d0 = c.dstY, d1 = c.dstY + c.dstH;
-                          const mx = (srcX + nodeW + dstX) / 2;
-                          const path = `M${srcX+nodeW},${s0} C${mx},${s0} ${mx},${d0} ${dstX},${d0} L${dstX},${d1} C${mx},${d1} ${mx},${s1} ${srcX+nodeW},${s1} Z`;
-
-                          return (
-                            <g key={c.name}>
-                              <path d={path} fill={c.color} opacity={0.3} />
-                              {/* Destination node bar */}
-                              <rect x={dstX} y={d0} width={nodeW} height={Math.max(2, c.dstH)} rx={3} fill={c.color} />
-                              {/* Category dot + label to the right */}
-                              <circle cx={dstX + nodeW + 10} cy={d0 + c.dstH / 2} r={4} fill={c.color} />
-                              <text x={dstX + nodeW + 20} y={d0 + c.dstH / 2 - 6} fill={T.text} fontSize={11} fontFamily="DM Sans" dominantBaseline="middle" fontWeight="500">{c.name}</text>
-                              <text x={dstX + nodeW + 20} y={d0 + c.dstH / 2 + 8} fill={T.muted} fontSize={10} fontFamily="DM Sans" dominantBaseline="middle">{fmt(c.value)} · {(pct*100).toFixed(1)}%</text>
-                            </g>
-                          );
-                        })}
-                      </svg>
+                        {/* Expanded: stacked category breakdown table */}
+                        {sankeyExpanded && (
+                          <div style={{ marginTop: 24, borderTop: `1px solid ${T.border}`, paddingTop: 20 }}>
+                            <div style={{ fontFamily: "Syne", fontWeight: 600, marginBottom: 14, fontSize: 15 }}>Category Totals</div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                              {sankeyData.map((c) => {
+                                const pct = c.value / totalFlow;
+                                return (
+                                  <div key={c.name} style={{ display: "grid", gridTemplateColumns: "180px 1fr 90px 70px", alignItems: "center", gap: 12 }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                      <span style={{ width: 10, height: 10, borderRadius: 3, background: c.color, flexShrink: 0, display: "inline-block" }} />
+                                      <span style={{ fontSize: 13, fontWeight: 500 }}>{c.name}</span>
+                                    </div>
+                                    <div style={{ position: "relative", height: 8, background: "rgba(255,255,255,0.06)", borderRadius: 4, overflow: "hidden" }}>
+                                      <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${(pct * 100).toFixed(1)}%`, background: c.color, borderRadius: 4, transition: "width 0.5s ease" }} />
+                                    </div>
+                                    <span style={{ fontSize: 13, color: T.text, textAlign: "right", fontWeight: 600 }}>{fmt(c.value)}</span>
+                                    <span style={{ fontSize: 12, color: T.muted, textAlign: "right" }}>{(pct*100).toFixed(1)}%</span>
+                                  </div>
+                                );
+                              })}
+                              {/* Total row */}
+                              <div style={{ display: "grid", gridTemplateColumns: "180px 1fr 90px 70px", alignItems: "center", gap: 12, marginTop: 8, paddingTop: 12, borderTop: `1px solid ${T.border}` }}>
+                                <span style={{ fontSize: 13, fontWeight: 700 }}>Total</span>
+                                <div />
+                                <span style={{ fontSize: 13, fontWeight: 700, color: T.teal, textAlign: "right" }}>{fmt(totalFlow)}</span>
+                                <span style={{ fontSize: 12, color: T.muted, textAlign: "right" }}>100%</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     );
                   })()}
                 </div>
@@ -1058,7 +1104,7 @@ export default function BudgetApp() {
                           { key: "amount", label: "Amount", right: true },
                         ].map(col => (
                           <th key={col.key} style={{ textAlign: col.right ? "right" : "left", cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }}
-                            onClick={() => { if (sortCol === col.key) setSortDir(d => d === "asc" ? "desc" : "asc"); else { setSortCol(col.key); setSortDir(col.key === "amount" ? "desc" : "asc"); } }}>
+                            onClick={() => { setTxnPage(0); if (sortCol === col.key) setSortDir(d => d === "asc" ? "desc" : "asc"); else { setSortCol(col.key); setSortDir(col.key === "amount" ? "desc" : "asc"); } }}>
                             {col.label}
                             <span style={{ marginLeft: 4, opacity: sortCol === col.key ? 1 : 0.3, fontSize: 10 }}>
                               {sortCol === col.key ? (sortDir === "asc" ? "▲" : "▼") : "▲▼"}
@@ -1083,7 +1129,7 @@ export default function BudgetApp() {
                           return ca.localeCompare(cb) * dir;
                         }
                         return 0;
-                      }).slice(0, 200).map(t => {
+                      }).slice(txnPage * TXN_PAGE_SIZE, (txnPage + 1) * TXN_PAGE_SIZE).map(t => {
                         const cat = categories.find(c => c.id === t.categoryId);
                         return (
                           <tr key={t.id}>
@@ -1114,7 +1160,48 @@ export default function BudgetApp() {
                     </tbody>
                   </table>
                 </div>
-                {transactions.length > 100 && <div style={{ padding: 14, textAlign: "center", color: T.muted, fontSize: 13 }}>Showing first 100 of {transactions.length} transactions</div>}
+                {(() => {
+                  const sorted = [...transactions].sort((a, b) => {
+                    const dir = sortDir === "asc" ? 1 : -1;
+                    if (sortCol === "date") return (new Date(a.date) - new Date(b.date)) * dir;
+                    if (sortCol === "amount") return (a.amount - b.amount) * dir;
+                    if (sortCol === "description") return a.description.localeCompare(b.description) * dir;
+                    if (sortCol === "category") {
+                      const ca = categories.find(c => c.id === a.categoryId)?.name || "";
+                      const cb = categories.find(c => c.id === b.categoryId)?.name || "";
+                      return ca.localeCompare(cb) * dir;
+                    }
+                    return 0;
+                  });
+                  const totalPages = Math.ceil(sorted.length / TXN_PAGE_SIZE);
+                  const start = txnPage * TXN_PAGE_SIZE + 1;
+                  const end = Math.min((txnPage + 1) * TXN_PAGE_SIZE, sorted.length);
+                  if (totalPages <= 1) return null;
+                  return (
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: `1px solid ${T.border}` }}>
+                      <span style={{ fontSize: 13, color: T.muted }}>Showing {start}–{end} of {sorted.length} transactions</span>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        <button className="btn btn-ghost" style={{ padding: "4px 10px", fontSize: 13 }}
+                          onClick={() => setTxnPage(0)} disabled={txnPage === 0}>«</button>
+                        <button className="btn btn-ghost" style={{ padding: "4px 10px", fontSize: 13 }}
+                          onClick={() => setTxnPage(p => Math.max(0, p - 1))} disabled={txnPage === 0}>‹ Prev</button>
+                        {Array.from({ length: totalPages }, (_, i) => i).filter(i => Math.abs(i - txnPage) <= 2).map(i => (
+                          <button key={i} onClick={() => setTxnPage(i)}
+                            style={{ padding: "4px 10px", fontSize: 13, borderRadius: 8, cursor: "pointer", fontFamily: "DM Sans",
+                              background: i === txnPage ? T.teal : "rgba(255,255,255,0.05)",
+                              color: i === txnPage ? "#0a0a1a" : T.text,
+                              border: `1px solid ${i === txnPage ? T.teal : T.border}` }}>
+                            {i + 1}
+                          </button>
+                        ))}
+                        <button className="btn btn-ghost" style={{ padding: "4px 10px", fontSize: 13 }}
+                          onClick={() => setTxnPage(p => Math.min(totalPages - 1, p + 1))} disabled={txnPage === totalPages - 1}>Next ›</button>
+                        <button className="btn btn-ghost" style={{ padding: "4px 10px", fontSize: 13 }}
+                          onClick={() => setTxnPage(totalPages - 1)} disabled={txnPage === totalPages - 1}>»</button>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             ) : (
               <div style={{ textAlign: "center", padding: 40, color: T.muted }}>No transactions yet. Upload a file to get started!</div>
