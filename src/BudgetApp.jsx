@@ -895,7 +895,21 @@ function AuthScreen({ onAuth }) {
     setLoading(true);
     const result = mode === "login" ? await auth.signIn(email, password) : await auth.signUp(email, password);
     setLoading(false);
-    if (result.error) { setError(result.error); return; }
+    if (result.error) {
+      // Translate Supabase error messages into plain language
+      const raw = result.error.toLowerCase();
+      if (raw.includes("password should contain") || raw.includes("password is too weak") || raw.includes("minimum"))
+        setError("Password must include uppercase, lowercase, a number, and a special character (e.g. kabukiB@by1).");
+      else if (raw.includes("invalid login") || raw.includes("invalid credentials") || raw.includes("email not confirmed"))
+        setError("Email or password is incorrect. Please try again.");
+      else if (raw.includes("user already registered") || raw.includes("already been registered"))
+        setError("An account with this email already exists. Try signing in instead.");
+      else if (raw.includes("rate limit") || raw.includes("too many"))
+        setError("Too many attempts. Please wait a moment and try again.");
+      else
+        setError(result.error);
+      return;
+    }
     if (mode === "signup" && !result.data.access_token) {
       setSuccess("Check your email for a confirmation link, then log in.");
       setMode("login"); return;
