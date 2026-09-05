@@ -1066,9 +1066,15 @@ export default function BudgetApp() {
             const loadedIds = new Set(cats.map(c => c.id));
             const missingDefaults = DEFAULT_CATEGORIES.filter(c => !loadedIds.has(c.id));
             setCategories([...cats, ...missingDefaults]);
+            // Mark as onboarded since they already have categories set up
+            const uid = auth.getUserId();
+            if (uid) localStorage.setItem(`smartbudget_onboarded_${uid}`, "1");
           } else {
-            // Brand new user — show account type screen first
             setCategories([]);
+          }
+          // Show onboarding for this specific user if they haven't completed it
+          const onboarded = localStorage.getItem(`smartbudget_onboarded_${auth.getUserId()}`);
+          if (!onboarded) {
             setShowAccountTypeScreen(true);
           }
           if (bls.length) setBills(bls);
@@ -1398,6 +1404,9 @@ export default function BudgetApp() {
         <CategoryPicker accountType={accountType} onConfirm={(chosen) => {
           setCategories(chosen);
           setShowCategoryPicker(false);
+          // Mark this user as onboarded so they don't see the picker again
+          const uid = auth.getUserId();
+          if (uid) localStorage.setItem(`smartbudget_onboarded_${uid}`, "1");
           if (dbStatus === "connected") {
             sb.upsertMany("categories", chosen).catch(() => {});
           }
@@ -3259,3 +3268,4 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
     </div>
   );
 }
+
