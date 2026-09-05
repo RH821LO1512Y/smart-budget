@@ -328,10 +328,12 @@ const sb = {
   url: (table, query = "") => `${SUPABASE_URL}/rest/v1/${table}${query}`,
 
   async getAll(table) {
-    const res = await fetch(sb.url(table, "?order=created_at.asc"), { headers: sb.headers() });
-    if (res.status === 401) { await auth.refresh(); }
-    if (!res.ok) return [];
-    return res.json();
+    try {
+      const res = await fetch(sb.url(table, "?order=created_at.asc"), { headers: sb.headers() });
+      if (res.status === 401) { await auth.refresh(); }
+      if (!res.ok) return []; // 400 = table/column not set up yet — fail silently
+      return await res.json();
+    } catch(e) { return []; }
   },
 
   async upsert(table, row) {
@@ -878,6 +880,222 @@ function CategoryPicker({ accountType = "personal", onConfirm }) {
   );
 }
 
+// ── Keyword Rules Onboarding Screen ──────────────────────────────────────────
+function KeywordRulesScreen({ categories, initialKeywords, onConfirm }) {
+  const sortedCats = [...categories].sort((a,b) => a.name.localeCompare(b.name));
+  const [rules, setRules] = useState(
+    initialKeywords.length ? initialKeywords.map(k => ({ ...k })) :
+    DEFAULT_KEYWORDS.map(k => ({ ...k }))
+  );
+  const [newKw, setNewKw] = useState("");
+  const [newCat, setNewCat] = useState(sortedCats[0]?.id || "");
+
+  const addRule = () => {
+    const kw = newKw.trim().toLowerCase();
+    if (!kw || !newCat) return;
+    if (rules.some(r => r.keyword === kw)) { setNewKw(""); return; }
+    setRules(prev => [...prev, { id: `kw_${Date.now()}`, keyword: kw, categoryId: newCat }]);
+    setNewKw("");
+  };
+
+  const removeRule = (id) => setRules(prev => prev.filter(r => r.id !== id));
+
+  return (
+    <div style={{ minHeight: "100vh", background: T.bg, color: T.text, overflowY: "auto" }}>
+      <div style={{ maxWidth: 680, margin: "0 auto", padding: "40px 20px 120px" }}>
+        {/* Header */}
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <div style={{ fontFamily: "Syne", fontSize: 28, fontWeight: 800, marginBottom: 8 }}>
+            <span style={{ color: T.teal }}>$</span><span>mart</span><span style={{ color: "#A78BFA" }}>Budget</span>
+          </div>
+          <div style={{ fontFamily: "Syne", fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Set up your keyword rules</div>
+          <div style={{ color: T.muted, fontSize: 14, lineHeight: 1.6, maxWidth: 480, margin: "0 auto" }}>
+            When you upload a bank statement, these keywords automatically sort your transactions into the right categories. You can always add more later.
+          </div>
+        </div>
+
+        {/* Add new rule */}
+        <div className="card" style={{ marginBottom: 24 }}>
+          <div style={{ fontFamily: "Syne", fontWeight: 600, marginBottom: 14 }}>Add a rule</div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <input className="input" placeholder='Keyword (e.g. "heb", "netflix", "employer name")'
+              value={newKw} onChange={e => setNewKw(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && addRule()}
+              style={{ flex: "1 1 200px" }} />
+            <select className="input" value={newCat} onChange={e => setNewCat(e.target.value)}
+              style={{ flex: "1 1 160px" }}>
+              {sortedCats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <button className="btn btn-primary" onClick={addRule} style={{ whiteSpace: "nowrap" }}>
+              + Add Rule
+            </button>
+          </div>
+          <div style={{ fontSize: 12, color: T.muted, marginTop: 8 }}>
+            If a transaction description contains the keyword, it gets assigned to that category automatically.
+          </div>
+        </div>
+
+        {/* Current rules */}
+        <div className="card">
+          <div style={{ fontFamily: "Syne", fontWeight: 600, marginBottom: 14 }}>
+            Your rules <span style={{ fontSize: 12, color: T.muted, fontWeight: 400 }}>({rules.length} total)</span>
+          </div>
+
+          {/* Group by category */}
+          {sortedCats.filter(cat => rules.some(r => r.categoryId === cat.id)).map(cat => (
+            <div key={cat.id} style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: cat.color, display: "inline-block" }} />
+                <span style={{ fontSize: 12, fontWeight: 600, color: T.muted, textTransform: "uppercase", letterSpacing: 0.8 }}>{cat.name}</span>
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, paddingLeft: 16 }}>
+                {rules.filter(r => r.categoryId === cat.id).map(rule => (
+                  <span key={rule.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px",
+                    background: `${cat.color}15`, border: `1px solid ${cat.color}40`, borderRadius: 20,
+                    fontSize: 12, color: T.text }}>
+                    {rule.keyword}
+                    <button onClick={() => removeRule(rule.id)}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: T.muted, fontSize: 13, lineHeight: 1, padding: 0 }}>×</button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {rules.length === 0 && (
+            <div style={{ color: T.muted, fontSize: 13, textAlign: "center", padding: 20 }}>No rules yet — add some above!</div>
+          )}
+        </div>
+
+        {/* Sticky footer */}
+        <div style={{ position: "fixed", bottom: 0, left: 0, right: 0,
+          background: `linear-gradient(transparent, ${T.bg} 30%)`, padding: "24px 20px 20px",
+          display: "flex", justifyContent: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16, background: T.card,
+            border: `1px solid ${T.border}`, borderRadius: 16, padding: "12px 20px",
+            boxShadow: "0 -8px 32px rgba(0,0,0,0.4)" }}>
+            <span style={{ fontSize: 13, color: T.muted }}>{rules.length} rules configured</span>
+            <button onClick={() => onConfirm([])}
+              style={{ padding: "8px 16px", borderRadius: 10, background: "rgba(255,255,255,0.06)",
+                color: T.muted, border: `1px solid ${T.border}`, cursor: "pointer", fontFamily: "DM Sans", fontSize: 13 }}>
+              Skip for now
+            </button>
+            <button onClick={() => onConfirm(rules)}
+              style={{ padding: "10px 28px", borderRadius: 10, background: T.teal, color: T.bg,
+                border: "none", cursor: "pointer", fontFamily: "DM Sans", fontSize: 14, fontWeight: 600 }}>
+              Save & Continue →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Setup Genie ───────────────────────────────────────────────────────────────
+const GENIE_STEPS = [
+  {
+    emoji: "🧞",
+    title: "Welcome to $martBudget!",
+    subtitle: "Your personal financial co-pilot. Here's a quick tour so you get the most out of it.",
+    tip: null,
+  },
+  {
+    emoji: "📤",
+    title: "Import your bank statement",
+    subtitle: "Go to the Transactions tab and drag in a CSV or Excel file from your bank. The app auto-detects your bank format.",
+    tip: "💡 Supports Wells Fargo, Chase, Bank of America, and most other banks.",
+  },
+  {
+    emoji: "🏷️",
+    title: "Transactions get sorted automatically",
+    subtitle: "Your keyword rules match descriptions to categories. Anything that doesn't match goes to 'Other' — just reassign it from the dropdown.",
+    tip: "💡 Add more keyword rules anytime in Categories → Keyword Rules.",
+  },
+  {
+    emoji: "📊",
+    title: "Set your monthly budgets",
+    subtitle: "Go to Categories and click the pencil ✏️ icon on any card to set a monthly budget. The progress bar fills as you spend.",
+    tip: "💡 Click any category card to see all the transactions inside it.",
+  },
+  {
+    emoji: "💰",
+    title: "Track your savings goals",
+    subtitle: "Go to Savings to create goals like an emergency fund or vacation. Link specific transactions to goals to see real progress.",
+    tip: "💡 The Savings Trend chart on the Dashboard shows your cumulative savings over time.",
+  },
+  {
+    emoji: "📅",
+    title: "Compare months side by side",
+    subtitle: "Go to the Compare tab and select up to 3 months to see exactly where your spending changed.",
+    tip: "💡 Use the date range picker in the sidebar to filter any view to a custom period.",
+  },
+  {
+    emoji: "🎉",
+    title: "You're all set!",
+    subtitle: "Upload your first bank statement to bring your dashboard to life. You can re-open this guide anytime from the 🧞 Setup Genie button in the sidebar.",
+    tip: null,
+  },
+];
+
+function SetupGenie({ onClose }) {
+  const [step, setStep] = useState(0);
+  const s = GENIE_STEPS[step];
+  const isLast = step === GENIE_STEPS.length - 1;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000,
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ width: "100%", maxWidth: 500, padding: 0, overflow: "hidden", borderRadius: 20 }}>
+        {/* Progress dots */}
+        <div style={{ display: "flex", gap: 6, justifyContent: "center", padding: "20px 24px 0" }}>
+          {GENIE_STEPS.map((_, i) => (
+            <button key={i} onClick={() => setStep(i)}
+              style={{ width: i === step ? 24 : 8, height: 8, borderRadius: 4, border: "none",
+                cursor: "pointer", transition: "all 0.3s",
+                background: i === step ? T.teal : i < step ? `${T.teal}60` : "rgba(255,255,255,0.1)" }} />
+          ))}
+        </div>
+
+        {/* Content */}
+        <div style={{ padding: "28px 32px 24px", textAlign: "center" }}>
+          <div style={{ fontSize: 56, marginBottom: 16, lineHeight: 1 }}>{s.emoji}</div>
+          <div style={{ fontFamily: "Syne", fontSize: 22, fontWeight: 700, marginBottom: 12, color: T.text }}>
+            {s.title}
+          </div>
+          <div style={{ color: T.muted, fontSize: 14, lineHeight: 1.7, marginBottom: s.tip ? 16 : 0 }}>
+            {s.subtitle}
+          </div>
+          {s.tip && (
+            <div style={{ background: `${T.teal}12`, border: `1px solid ${T.teal}30`, borderRadius: 10,
+              padding: "10px 14px", fontSize: 13, color: T.teal, lineHeight: 1.5 }}>
+              {s.tip}
+            </div>
+          )}
+        </div>
+
+        {/* Nav buttons */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+          padding: "16px 24px 24px", borderTop: `1px solid ${T.border}` }}>
+          <button onClick={step === 0 ? onClose : () => setStep(s => s - 1)}
+            style={{ padding: "8px 16px", borderRadius: 10, background: "rgba(255,255,255,0.05)",
+              color: T.muted, border: `1px solid ${T.border}`, cursor: "pointer", fontFamily: "DM Sans", fontSize: 13 }}>
+            {step === 0 ? "Skip tour" : "← Back"}
+          </button>
+          <span style={{ fontSize: 12, color: T.muted }}>{step + 1} of {GENIE_STEPS.length}</span>
+          <button onClick={isLast ? onClose : () => setStep(s => s + 1)}
+            style={{ padding: "10px 24px", borderRadius: 10,
+              background: isLast ? T.teal : "#A78BFA",
+              color: T.bg, border: "none", cursor: "pointer", fontFamily: "DM Sans", fontSize: 14, fontWeight: 600 }}>
+            {isLast ? "Get started! 🚀" : "Next →"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AuthScreen({ onAuth }) {
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
@@ -1030,10 +1248,15 @@ export default function BudgetApp() {
   const [sortDir, setSortDir] = useState("desc");
   const [txnPage, setTxnPage] = useState(0);
   const TXN_PAGE_SIZE = 100;
+  const [txnSearch, setTxnSearch] = useState("");
+  const [txnFilterCat, setTxnFilterCat] = useState("all");
+  const [txnFilterType, setTxnFilterType] = useState("all"); // "all" | "debit" | "credit"
   const [sankeyExpanded, setSankeyExpanded] = useState(false);
   const [compareMonths, setCompareMonths] = useState([]); // up to 3 "YYYY-MM" strings
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showAccountTypeScreen, setShowAccountTypeScreen] = useState(false);
+  const [showKeywordScreen, setShowKeywordScreen] = useState(false);
+  const [showSetupGenie, setShowSetupGenie] = useState(false);
   // "personal" | "business" | "both" — persisted per user in localStorage
   const [accountType, setAccountType] = useState(() => {
     try {
@@ -1404,14 +1627,33 @@ export default function BudgetApp() {
         <CategoryPicker accountType={accountType} onConfirm={(chosen) => {
           setCategories(chosen);
           setShowCategoryPicker(false);
-          // Mark this user as onboarded so they don't see the picker again
-          const uid = auth.getUserId();
-          if (uid) localStorage.setItem(`smartbudget_onboarded_${uid}`, "1");
           if (dbStatus === "connected") {
             sb.upsertMany("categories", chosen).catch(() => {});
           }
-          localStorage.removeItem("smartbudget_setup_done");
+          setShowKeywordScreen(true);
         }} />
+      </>
+    );
+  }
+
+  if (showKeywordScreen) {
+    return (
+      <>
+        <StyleTag />
+        <KeywordRulesScreen
+          categories={categories}
+          initialKeywords={customKeywords}
+          onConfirm={(keywords) => {
+            setCustomKeywords(keywords);
+            setShowKeywordScreen(false);
+            // Mark onboarded and show setup genie
+            const uid = auth.getUserId();
+            if (uid) localStorage.setItem(`smartbudget_onboarded_${uid}`, "1");
+            localStorage.removeItem("smartbudget_setup_done");
+            if (dbStatus === "connected") sb.upsertMany("custom_keywords", keywords).catch(() => {});
+            setShowSetupGenie(true);
+          }}
+        />
       </>
     );
   }
@@ -1517,8 +1759,16 @@ export default function BudgetApp() {
           </div>
         )}
 
+        {/* Setup Genie button */}
+        <button className="nav-item" onClick={() => setShowSetupGenie(true)}
+          style={{ marginTop: "auto", color: T.muted, gap: 10, borderRadius: 10,
+            background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}` }}>
+          <span style={{ fontSize: 16 }}>🧞</span>
+          <span>Setup Genie</span>
+        </button>
+
         {/* User + logout */}
-        <div style={{ marginTop: "auto", paddingTop: 16, borderTop: `1px solid ${T.border}` }}>
+        <div style={{ paddingTop: 12, borderTop: `1px solid ${T.border}`, marginTop: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", marginBottom: 6 }}>
             <UserCircle size={18} style={{ color: T.teal, flexShrink: 0 }} />
             <span style={{ fontSize: 12, color: T.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user?.email}</span>
@@ -1770,7 +2020,7 @@ export default function BudgetApp() {
         {/* ─ Transactions ─ */}
         {tab === "transactions" && (
           <div className="fade-in">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
               <div>
                 <h1 style={{ fontFamily: "Syne", fontSize: 26, fontWeight: 700 }}>Transactions</h1>
                 <p style={{ color: T.muted, fontSize: 14 }}>{transactions.length} total transactions</p>
@@ -1784,6 +2034,51 @@ export default function BudgetApp() {
                 </button>
               </div>
               <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls,.pdf" style={{ display: "none" }} onChange={e => handleFiles(e.target.files)} />
+            </div>
+
+            {/* ── Search + Filter bar ── */}
+            <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+              {/* Search */}
+              <div style={{ position: "relative", flex: "1 1 220px" }}>
+                <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: T.muted, fontSize: 14, pointerEvents: "none" }}>🔍</span>
+                <input className="input" placeholder="Search descriptions..."
+                  value={txnSearch}
+                  onChange={e => { setTxnSearch(e.target.value); setTxnPage(0); }}
+                  style={{ paddingLeft: 34 }} />
+              </div>
+
+              {/* Category filter */}
+              <select className="input" style={{ flex: "1 1 160px", maxWidth: 220 }}
+                value={txnFilterCat}
+                onChange={e => { setTxnFilterCat(e.target.value); setTxnPage(0); }}>
+                <option value="all">All Categories</option>
+                <option value="uncategorized">— Uncategorized —</option>
+                {sortedCategories.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+
+              {/* Debit / Credit filter */}
+              <div style={{ display: "flex", gap: 0, background: "rgba(255,255,255,0.04)", borderRadius: 10, padding: 3, flexShrink: 0 }}>
+                {[{ id: "all", label: "All" }, { id: "debit", label: "💸 Debits" }, { id: "credit", label: "💰 Credits" }].map(opt => (
+                  <button key={opt.id} onClick={() => { setTxnFilterType(opt.id); setTxnPage(0); }}
+                    style={{ padding: "6px 12px", border: "none", borderRadius: 8, cursor: "pointer",
+                      fontFamily: "DM Sans", fontSize: 12, fontWeight: 500, whiteSpace: "nowrap",
+                      background: txnFilterType === opt.id ? T.teal : "transparent",
+                      color: txnFilterType === opt.id ? T.bg : T.muted,
+                      transition: "all 0.15s" }}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Clear filters */}
+              {(txnSearch || txnFilterCat !== "all" || txnFilterType !== "all") && (
+                <button className="btn btn-ghost" style={{ fontSize: 12, padding: "6px 12px", flexShrink: 0 }}
+                  onClick={() => { setTxnSearch(""); setTxnFilterCat("all"); setTxnFilterType("all"); setTxnPage(0); }}>
+                  ✕ Clear filters
+                </button>
+              )}
             </div>
 
             {/* Drop zone */}
@@ -1821,21 +2116,31 @@ export default function BudgetApp() {
                       </tr>
                     </thead>
                     <tbody>
-                      {[...transactions].sort((a, b) => {
-                        const dir = sortDir === "asc" ? 1 : -1;
-                        if (sortCol === "date") {
-                          const da = new Date(a.date), db = new Date(b.date);
-                          return (da - db) * dir;
-                        }
-                        if (sortCol === "amount") return (a.amount - b.amount) * dir;
-                        if (sortCol === "description") return a.description.localeCompare(b.description) * dir;
-                        if (sortCol === "category") {
-                          const ca = categories.find(c => c.id === a.categoryId)?.name || "";
-                          const cb = categories.find(c => c.id === b.categoryId)?.name || "";
-                          return ca.localeCompare(cb) * dir;
-                        }
-                        return 0;
-                      }).slice(txnPage * TXN_PAGE_SIZE, (txnPage + 1) * TXN_PAGE_SIZE).map(t => {
+                      {(() => {
+                        const q = txnSearch.toLowerCase().trim();
+                        return [...transactions]
+                          .filter(t => {
+                            if (q && !t.description?.toLowerCase().includes(q)) return false;
+                            if (txnFilterCat === "uncategorized" && t.categoryId) return false;
+                            if (txnFilterCat !== "all" && txnFilterCat !== "uncategorized" && t.categoryId !== txnFilterCat) return false;
+                            if (txnFilterType === "debit" && t.amount >= 0) return false;
+                            if (txnFilterType === "credit" && t.amount < 0) return false;
+                            return true;
+                          })
+                          .sort((a, b) => {
+                            const dir = sortDir === "asc" ? 1 : -1;
+                            if (sortCol === "date") { const da = new Date(a.date), db = new Date(b.date); return (da - db) * dir; }
+                            if (sortCol === "amount") return (a.amount - b.amount) * dir;
+                            if (sortCol === "description") return a.description.localeCompare(b.description) * dir;
+                            if (sortCol === "category") {
+                              const ca = categories.find(c => c.id === a.categoryId)?.name || "";
+                              const cb = categories.find(c => c.id === b.categoryId)?.name || "";
+                              return ca.localeCompare(cb) * dir;
+                            }
+                            return 0;
+                          })
+                          .slice(txnPage * TXN_PAGE_SIZE, (txnPage + 1) * TXN_PAGE_SIZE)
+                          .map(t => {
                         const cat = categories.find(c => c.id === t.categoryId);
                         return (
                           <tr key={t.id}>
@@ -1869,12 +2174,24 @@ export default function BudgetApp() {
                             </td>
                           </tr>
                         );
-                      })}
+                      }); // end .map(t =>
+                        })() /* end filter/sort IIFE */
+                      }
                     </tbody>
                   </table>
                 </div>
                 {(() => {
-                  const sorted = [...transactions].sort((a, b) => {
+                  const q2 = txnSearch.toLowerCase().trim();
+                  const sorted = [...transactions]
+                    .filter(t => {
+                      if (q2 && !t.description?.toLowerCase().includes(q2)) return false;
+                      if (txnFilterCat === "uncategorized" && t.categoryId) return false;
+                      if (txnFilterCat !== "all" && txnFilterCat !== "uncategorized" && t.categoryId !== txnFilterCat) return false;
+                      if (txnFilterType === "debit" && t.amount >= 0) return false;
+                      if (txnFilterType === "credit" && t.amount < 0) return false;
+                      return true;
+                    })
+                    .sort((a, b) => {
                     const dir = sortDir === "asc" ? 1 : -1;
                     if (sortCol === "date") return (new Date(a.date) - new Date(b.date)) * dir;
                     if (sortCol === "amount") return (a.amount - b.amount) * dir;
@@ -2575,6 +2892,11 @@ export default function BudgetApp() {
         )}
 
 
+      {/* ── Setup Genie ── */}
+      {showSetupGenie && (
+        <SetupGenie onClose={() => setShowSetupGenie(false)} />
+      )}
+
       {modal && <Modal modal={modal} setModal={setModal} categories={categories} setCategories={setCategories} bills={bills} setBills={setBills} schedule={schedule} setSchedule={setSchedule} transactions={transactions} setTransactions={setTransactions} customKeywords={customKeywords} setCustomKeywords={setCustomKeywords} savingsGoals={savingsGoals} setSavingsGoals={setSavingsGoals} dbStatus={dbStatus} notify={notify} guessCategory={guessCategory} />}
     </div>
   );
@@ -2582,6 +2904,7 @@ export default function BudgetApp() {
 
 // ─── Category Drilldown Component ────────────────────────────────────────────
 function CategoryDrilldown({ modal, categories, transactions, setTransactions, dbStatus, notify, close }) {
+  const sortedCategories = [...(categories || [])].sort((a, b) => a.name.localeCompare(b.name));
   const { cat } = modal;
   const [search, setSearch] = useState("");
 
@@ -3066,6 +3389,7 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
   const [form, setForm] = useState({});
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const close = () => setModal(null);
+  const sortedCategories = [...(categories || [])].sort((a, b) => a.name.localeCompare(b.name));
 
   const submit = () => {
     if (modal.type === "addCategory") {
@@ -3268,4 +3592,3 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
     </div>
   );
 }
-
