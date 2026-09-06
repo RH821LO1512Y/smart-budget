@@ -907,9 +907,11 @@ const isSupabaseReady = () =>
   SUPABASE_ANON_KEY !== "YOUR_ANON_KEY_HERE";
 
 // Fallback to localStorage when Supabase is not yet configured
-const LOCAL_KEY = "budget_app_local";
-const localSave = (data) => { try { localStorage.setItem(LOCAL_KEY, JSON.stringify(data)); } catch (e) {} };
-const localLoad = () => { try { const d = localStorage.getItem(LOCAL_KEY); return d ? JSON.parse(d) : null; } catch (e) { return null; } };
+const localKey = () => {
+  try { const u = auth.getSession()?.user?.id; return u ? `budget_local_${u}` : "budget_app_local"; } catch(e) { return "budget_app_local"; }
+};
+const localSave = (data) => { try { localStorage.setItem(localKey(), JSON.stringify(data)); } catch (e) {} };
+const localLoad = () => { try { const d = localStorage.getItem(localKey()); return d ? JSON.parse(d) : null; } catch (e) { return null; } };
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const css = `
@@ -1519,54 +1521,39 @@ function KeywordRulesScreen({ categories, initialKeywords, onConfirm }) {
 
 // ── Setup Genie ───────────────────────────────────────────────────────────────
 const GENIE_STEPS = [
-  {
-    emoji: "🧞",
-    title: "Welcome to $martBudget!",
-    subtitle: "Your personal financial co-pilot. Here's a quick tour so you get the most out of it.",
-    tip: null,
-  },
-  {
-    emoji: "📤",
-    title: "Import your bank statement",
-    subtitle: "Go to the Transactions tab and drag in a CSV or Excel file from your bank. The app auto-detects your bank format.",
-    tip: "💡 Supports Wells Fargo, Chase, Bank of America, and most other banks.",
-  },
-  {
-    emoji: "🏷️",
-    title: "Transactions get sorted automatically",
-    subtitle: "Your keyword rules match descriptions to categories. Anything that doesn't match goes to 'Other' — just reassign it from the dropdown.",
-    tip: "💡 Add more keyword rules anytime in Categories → Keyword Rules.",
-  },
-  {
-    emoji: "📊",
-    title: "Set your monthly budgets",
-    subtitle: "Go to Categories and click the pencil ✏️ icon on any card to set a monthly budget. The progress bar fills as you spend.",
-    tip: "💡 Click any category card to see all the transactions inside it.",
-  },
-  {
-    emoji: "💰",
-    title: "Track your savings goals",
-    subtitle: "Go to Savings to create goals like an emergency fund or vacation. Link specific transactions to goals to see real progress.",
-    tip: "💡 The Savings Trend chart on the Dashboard shows your cumulative savings over time.",
-  },
-  {
-    emoji: "📅",
-    title: "Compare months side by side",
-    subtitle: "Go to the Compare tab and select up to 3 months to see exactly where your spending changed.",
-    tip: "💡 Use the date range picker in the sidebar to filter any view to a custom period.",
-  },
-  {
-    emoji: "🎉",
-    title: "You're all set!",
-    subtitle: "Upload your first bank statement to bring your dashboard to life. You can re-open this guide anytime from the 🧞 Setup Genie button in the sidebar.",
-    tip: null,
-  },
+  { emoji: "✨", title: "Welcome to $martBudget!", tab: null,
+    subtitle: "Your personal financial co-pilot. Let's take a quick tour — each step will take you right to the feature it's describing.",
+    tip: null },
+  { emoji: "📤", title: "Import your bank statement", tab: "transactions",
+    subtitle: "Drag in a CSV or Excel file from your bank. The app auto-detects Wells Fargo, Chase, Bank of America, and most other formats.",
+    tip: "💡 You can also click Upload File in the top right of this page." },
+  { emoji: "🏷️", title: "Transactions get sorted automatically", tab: "transactions",
+    subtitle: "Your keyword rules match descriptions to categories. Anything unmatched lands in 'Other' — just reassign it from the dropdown.",
+    tip: "💡 The more keywords you set up, the less manual sorting you'll need." },
+  { emoji: "📊", title: "Set your monthly budgets", tab: "categories",
+    subtitle: "Click the ✏️ pencil icon on any category card to set a monthly budget. The progress bar fills as you spend.",
+    tip: "💡 Click any card to see all transactions inside that category." },
+  { emoji: "💰", title: "Track your savings goals", tab: "savings",
+    subtitle: "Create goals like an emergency fund or vacation fund. Link transactions to a goal to track real progress.",
+    tip: "💡 The Savings Trend on the Dashboard shows your cumulative savings over time." },
+  { emoji: "📅", title: "Compare months side by side", tab: "compare",
+    subtitle: "Select up to 3 months to see exactly where your spending changed — great for spotting patterns.",
+    tip: "💡 Use the date range picker in the sidebar to filter any view to a custom period." },
+  { emoji: "🎉", title: "You're all set!", tab: "dashboard",
+    subtitle: "Upload your first bank statement to bring your dashboard to life. Re-open this guide anytime from ✨ Setup Genie in the sidebar.",
+    tip: null },
 ];
 
-function SetupGenie({ onClose }) {
+function SetupGenie({ onClose, setTab }) {
   const [step, setStep] = useState(0);
   const s = GENIE_STEPS[step];
   const isLast = step === GENIE_STEPS.length - 1;
+
+  const goToStep = (i) => {
+    setStep(i);
+    const dest = GENIE_STEPS[i].tab;
+    if (dest && setTab) setTab(dest);
+  };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000,
@@ -1576,7 +1563,7 @@ function SetupGenie({ onClose }) {
         {/* Progress dots */}
         <div style={{ display: "flex", gap: 6, justifyContent: "center", padding: "20px 24px 0" }}>
           {GENIE_STEPS.map((_, i) => (
-            <button key={i} onClick={() => setStep(i)}
+            <button key={i} onClick={() => goToStep(i)}
               style={{ width: i === step ? 24 : 8, height: 8, borderRadius: 4, border: "none",
                 cursor: "pointer", transition: "all 0.3s",
                 background: i === step ? T.teal : i < step ? `${T.teal}60` : "rgba(255,255,255,0.1)" }} />
@@ -1585,6 +1572,13 @@ function SetupGenie({ onClose }) {
 
         {/* Content */}
         <div style={{ padding: "28px 32px 24px", textAlign: "center" }}>
+          {s.tab && (
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(167,139,250,0.12)",
+              border: "1px solid rgba(167,139,250,0.3)", borderRadius: 20, padding: "4px 12px",
+              fontSize: 11, color: "#A78BFA", marginBottom: 16, fontWeight: 500 }}>
+              <span>→</span> Navigating to: <strong style={{ textTransform: "capitalize" }}>{s.tab}</strong>
+            </div>
+          )}
           <div style={{ fontSize: 56, marginBottom: 16, lineHeight: 1 }}>{s.emoji}</div>
           <div style={{ fontFamily: "Syne", fontSize: 22, fontWeight: 700, marginBottom: 12, color: T.text }}>
             {s.title}
@@ -1603,13 +1597,13 @@ function SetupGenie({ onClose }) {
         {/* Nav buttons */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
           padding: "16px 24px 24px", borderTop: `1px solid ${T.border}` }}>
-          <button onClick={step === 0 ? onClose : () => setStep(s => s - 1)}
+          <button onClick={step === 0 ? onClose : () => goToStep(step - 1)}
             style={{ padding: "8px 16px", borderRadius: 10, background: "rgba(255,255,255,0.05)",
               color: T.muted, border: `1px solid ${T.border}`, cursor: "pointer", fontFamily: "DM Sans", fontSize: 13 }}>
             {step === 0 ? "Skip tour" : "← Back"}
           </button>
           <span style={{ fontSize: 12, color: T.muted }}>{step + 1} of {GENIE_STEPS.length}</span>
-          <button onClick={isLast ? onClose : () => setStep(s => s + 1)}
+          <button onClick={isLast ? onClose : () => goToStep(step + 1)}
             style={{ padding: "10px 24px", borderRadius: 10,
               background: isLast ? T.teal : "#A78BFA",
               color: T.bg, border: "none", cursor: "pointer", fontFamily: "DM Sans", fontSize: 14, fontWeight: 600 }}>
@@ -1789,7 +1783,13 @@ export default function BudgetApp() {
       return u ? (localStorage.getItem(`smartbudget_acct_${u.id}`) || "personal") : "personal";
     } catch(e) { return "personal"; }
   });
-  const [activeAccount, setActiveAccount] = useState("personal"); // current view filter
+  const [activeAccount, setActiveAccount] = useState(() => {
+    try {
+      const uid = auth.getSession()?.user?.id;
+      const stored = uid ? (localStorage.getItem(`smartbudget_acct_${uid}`) || "personal") : "personal";
+      return stored === "business" ? "business" : "personal";
+    } catch(e) { return "personal"; }
+  }); // current view filter
   const [notification, setNotification] = useState(null);
   const [modal, setModal] = useState(null);
   const fileRef = useRef();
@@ -1808,28 +1808,43 @@ export default function BudgetApp() {
             sb.getAll("schedule"),
             sb.getAll("custom_keywords"),
           ]);
+          // If Supabase returns empty, fall back to local backup first
+          const localBackup = localLoad();
+
           if (txns.length) setTransactions(migrateCategories(txns));
+          else if (localBackup?.transactions?.length) setTransactions(migrateCategories(localBackup.transactions));
+
           if (cats.length) {
-            // Merge loaded cats with defaults — add any new default cats not in DB
             const loadedIds = new Set(cats.map(c => c.id));
             const missingDefaults = DEFAULT_CATEGORIES.filter(c => !loadedIds.has(c.id));
             setCategories([...cats, ...missingDefaults]);
-            // Mark as onboarded since they already have categories set up
+            const uid = auth.getUserId();
+            if (uid) localStorage.setItem(`smartbudget_onboarded_${uid}`, "1");
+          } else if (localBackup?.categories?.length) {
+            setCategories(localBackup.categories);
             const uid = auth.getUserId();
             if (uid) localStorage.setItem(`smartbudget_onboarded_${uid}`, "1");
           } else {
             setCategories([]);
           }
-          // Show onboarding for this specific user if they haven't completed it
+
+          // Show onboarding for brand new users
           const onboarded = localStorage.getItem(`smartbudget_onboarded_${auth.getUserId()}`);
-          if (!onboarded) {
-            setShowAccountTypeScreen(true);
-          }
+          if (!onboarded) setShowAccountTypeScreen(true);
+
           if (bls.length) setBills(bls);
+          else if (localBackup?.bills?.length) setBills(localBackup.bills);
+
           if (sched.length) setSchedule(sched);
+          else if (localBackup?.schedule?.length) setSchedule(localBackup.schedule);
+
           if (kwds.length) setCustomKeywords(kwds);
+          else if (localBackup?.customKeywords?.length) setCustomKeywords(localBackup.customKeywords);
+
           const goals = await sb.getAll("savings_goals");
           if (goals.length) setSavingsGoals(goals);
+          else if (localBackup?.savingsGoals?.length) setSavingsGoals(localBackup.savingsGoals);
+
           setDbStatus("connected");
         } catch (e) {
           console.warn("Supabase load failed, falling back to local", e);
@@ -1865,19 +1880,19 @@ export default function BudgetApp() {
     }
   }, [loading]);
 
-  // Auto-save — mirrors every state change to Supabase or localStorage
+  // Auto-save — ALWAYS write to localStorage as backup, also sync to Supabase when connected
   useEffect(() => {
     if (loading) return;
+    // Always keep a local backup so refresh never loses data
+    localSave({ transactions, categories, bills, schedule, customKeywords, savingsGoals });
+    // Also sync to Supabase if connected
     if (dbStatus === "connected") {
-      // Supabase: upsert all rows (merge-duplicates handles updates)
       sb.upsertMany("transactions", transactions).catch(() => {});
       sb.upsertMany("categories", categories).catch(() => {});
       sb.upsertMany("bills", bills).catch(() => {});
       sb.upsertMany("schedule", schedule).catch(() => {});
       sb.upsertMany("custom_keywords", customKeywords).catch(() => {});
       sb.upsertMany("savings_goals", savingsGoals).catch(() => {});
-    } else {
-      localSave({ transactions, categories, bills, schedule, customKeywords, savingsGoals });
     }
   }, [transactions, categories, bills, schedule, customKeywords, savingsGoals, loading, dbStatus]);
 
@@ -2063,9 +2078,12 @@ export default function BudgetApp() {
   const savings = monthTxns.filter(t => { const c = categories.find(c => c.id === t.categoryId); return c?.type === "savings" && t.amount < 0; }).reduce((s, t) => s + Math.abs(t.amount), 0);
 
   const sortedCategories = [...categories]
-    .filter(c => activeAccount === "both" || (c.account || "personal") === activeAccount)
     .sort((a, b) => a.name.localeCompare(b.name));
-  const expenseByCategory = categories.filter(c => c.type === "expense").map(c => ({
+  // Account-filtered view for dashboard charts/cards
+  const accountCategories = activeAccount === "both"
+    ? sortedCategories
+    : sortedCategories.filter(c => (c.account || "personal") === activeAccount);
+  const expenseByCategory = accountCategories.filter(c => c.type === "expense").map(c => ({
     name: c.name,
     value: Math.abs(monthTxns.filter(t => t.categoryId === c.id && t.amount < 0).reduce((s, t) => s + t.amount, 0)),
     color: c.color,
@@ -2288,7 +2306,7 @@ export default function BudgetApp() {
         <button className="nav-item" onClick={() => setShowSetupGenie(true)}
           style={{ marginTop: "auto", color: T.muted, gap: 10, borderRadius: 10,
             background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}` }}>
-          <span style={{ fontSize: 16 }}>🧞</span>
+          <span style={{ fontSize: 16 }}>✨</span>
           <span>Setup Genie</span>
         </button>
 
@@ -3419,10 +3437,10 @@ export default function BudgetApp() {
 
       {/* ── Setup Genie ── */}
       {showSetupGenie && (
-        <SetupGenie onClose={() => setShowSetupGenie(false)} />
+        <SetupGenie onClose={() => setShowSetupGenie(false)} setTab={setTab} />
       )}
 
-      {modal && <Modal modal={modal} setModal={setModal} categories={categories} setCategories={setCategories} bills={bills} setBills={setBills} schedule={schedule} setSchedule={setSchedule} transactions={transactions} setTransactions={setTransactions} customKeywords={customKeywords} setCustomKeywords={setCustomKeywords} savingsGoals={savingsGoals} setSavingsGoals={setSavingsGoals} dbStatus={dbStatus} notify={notify} guessCategory={guessCategory} />}
+      {modal && <Modal modal={modal} setModal={setModal} categories={categories} setCategories={setCategories} bills={bills} setBills={setBills} schedule={schedule} setSchedule={setSchedule} transactions={transactions} setTransactions={setTransactions} customKeywords={customKeywords} setCustomKeywords={setCustomKeywords} savingsGoals={savingsGoals} setSavingsGoals={setSavingsGoals} dbStatus={dbStatus} notify={notify} guessCategory={guessCategory} setSetupComplete={setSetupComplete} />}
     </div>
   );
 }
@@ -3910,7 +3928,7 @@ function ColumnMapper({ modal, categories, customKeywords, setTransactions, noti
 
 // ─── Column Mapper Component ─────────────────────────────────────────────────
 // ─── Modal Component ──────────────────────────────────────────────────────────
-function Modal({ modal, setModal, categories, setCategories, bills, setBills, schedule, setSchedule, transactions, setTransactions, customKeywords, setCustomKeywords, savingsGoals, setSavingsGoals, dbStatus, notify, guessCategory }) {
+function Modal({ modal, setModal, categories, setCategories, bills, setBills, schedule, setSchedule, transactions, setTransactions, customKeywords, setCustomKeywords, savingsGoals, setSavingsGoals, dbStatus, notify, guessCategory, setSetupComplete }) {
   const [form, setForm] = useState({});
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const close = () => setModal(null);
