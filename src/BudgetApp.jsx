@@ -1259,19 +1259,8 @@ function CategoryPicker({ accountType = "personal", onConfirm }) {
   const personalTemplates = isBiz ? [] : CATEGORY_TEMPLATES;
   const bizTemplates      = (isBiz || isBoth) ? BUSINESS_CATEGORY_TEMPLATES : [];
 
-  const DEFAULT_PERSONAL = new Set([
-    "income","savings","housing","utilities","food","grocery",
-    "transport","health_ins","healthcare","credit_cards","entertainment",
-    "shopping","personal_care","other"
-  ]);
-  const DEFAULT_BIZ = new Set([
-    "biz_revenue","biz_services","biz_rent","biz_utilities","biz_software",
-    "biz_payroll","biz_ads","biz_taxes","biz_legal","biz_other"
-  ]);
-  const initialSelected = new Set([
-    ...(isBiz ? [] : DEFAULT_PERSONAL),
-    ...((isBiz || isBoth) ? DEFAULT_BIZ : []),
-  ]);
+  // Only pre-select the required categories — user picks everything else themselves
+  const initialSelected = new Set(REQUIRED_CAT_IDS);
   const [selected, setSelected] = useState(initialSelected);
   const [pickerTab, setPickerTab] = useState(isBiz ? "business" : "personal");
 
@@ -1556,22 +1545,28 @@ function SetupGenie({ onClose, setTab }) {
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000,
-      display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal" style={{ width: "100%", maxWidth: 500, padding: 0, overflow: "hidden", borderRadius: 20 }}>
-        {/* Progress dots */}
-        <div style={{ display: "flex", gap: 6, justifyContent: "center", padding: "20px 24px 0" }}>
-          {GENIE_STEPS.map((_, i) => (
-            <button key={i} onClick={() => goToStep(i)}
-              style={{ width: i === step ? 24 : 8, height: 8, borderRadius: 4, border: "none",
-                cursor: "pointer", transition: "all 0.3s",
-                background: i === step ? T.teal : i < step ? `${T.teal}60` : "rgba(255,255,255,0.1)" }} />
-          ))}
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000,
+      pointerEvents: "none" }}>
+      <div style={{ position: "fixed", top: 0, left: 244, bottom: 0, width: 380,
+        background: T.card, borderRight: `1px solid ${T.border}`,
+        boxShadow: "4px 0 32px rgba(0,0,0,0.4)",
+        display: "flex", flexDirection: "column", overflow: "hidden",
+        pointerEvents: "all", zIndex: 1001 }}>
+        {/* Header with close + progress */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px 12px", borderBottom: `1px solid ${T.border}` }}>
+          <div style={{ display: "flex", gap: 5 }}>
+            {GENIE_STEPS.map((_, i) => (
+              <button key={i} onClick={() => goToStep(i)}
+                style={{ width: i === step ? 20 : 7, height: 7, borderRadius: 4, border: "none",
+                  cursor: "pointer", transition: "all 0.3s",
+                  background: i === step ? T.teal : i < step ? `${T.teal}60` : "rgba(255,255,255,0.1)" }} />
+            ))}
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: T.muted, cursor: "pointer", fontSize: 18, lineHeight: 1 }}>×</button>
         </div>
 
         {/* Content */}
-        <div style={{ padding: "28px 32px 24px", textAlign: "center" }}>
+        <div style={{ padding: "28px 24px 20px", textAlign: "center", flex: 1, overflowY: "auto" }}>
           {s.tab && (
             <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(167,139,250,0.12)",
               border: "1px solid rgba(167,139,250,0.3)", borderRadius: 20, padding: "4px 12px",
@@ -1596,7 +1591,7 @@ function SetupGenie({ onClose, setTab }) {
 
         {/* Nav buttons */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
-          padding: "16px 24px 24px", borderTop: `1px solid ${T.border}` }}>
+          padding: "14px 20px 20px", borderTop: `1px solid ${T.border}`, flexShrink: 0 }}>
           <button onClick={step === 0 ? onClose : () => goToStep(step - 1)}
             style={{ padding: "8px 16px", borderRadius: 10, background: "rgba(255,255,255,0.05)",
               color: T.muted, border: `1px solid ${T.border}`, cursor: "pointer", fontFamily: "DM Sans", fontSize: 13 }}>
@@ -3264,11 +3259,11 @@ export default function BudgetApp() {
                 return { totals, income, expenses, net: income - expenses };
               };
 
-              const selectedData = compareMonths.map(ym => ({ ym, label: fmtMonthLabel(ym), ...getMonthTotals(ym) }));
+              const selectedData = [...compareMonths].sort().map(ym => ({ ym, label: fmtMonthLabel(ym), ...getMonthTotals(ym) }));
               const MONTH_COLORS = ["#A78BFA", "#4ADE80", "#60A5FA"];
 
               return (
-                <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 24, width: "100%" }}>
                   {/* Month selector chips */}
                   <div className="card">
                     <div style={{ fontFamily: "Syne", fontWeight: 600, marginBottom: 12 }}>Select Months</div>
@@ -3418,7 +3413,8 @@ export default function BudgetApp() {
                                   {selectedData.map((m, i) => <td key={i} style={{ padding: "10px 12px", textAlign: "right", color: T.coral }}>{fmt(m.expenses)}</td>)}
                                   {selectedData.length === 2 && (() => {
                                     const d = selectedData[1].expenses - selectedData[0].expenses;
-                                    return <td style={{ padding: "10px 12px", textAlign: "right", color: d > 0 ? T.coral : "#4ADE80" }}>{d >= 0 ? "+" : ""}{fmt(d)}</td>;
+                                    // Positive = spending went UP (bad), Negative = went DOWN (good)
+                                    return <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600, color: d > 0 ? T.coral : d < 0 ? "#4ADE80" : T.muted }}>{d === 0 ? "—" : `${d > 0 ? "+" : ""}${fmt(d)}`}</td>;
                                   })()}
                                 </tr>
                               </tbody>
@@ -3926,7 +3922,6 @@ function ColumnMapper({ modal, categories, customKeywords, setTransactions, noti
   );
 }
 
-// ─── Column Mapper Component ─────────────────────────────────────────────────
 // ─── Modal Component ──────────────────────────────────────────────────────────
 function Modal({ modal, setModal, categories, setCategories, bills, setBills, schedule, setSchedule, transactions, setTransactions, customKeywords, setCustomKeywords, savingsGoals, setSavingsGoals, dbStatus, notify, guessCategory, setSetupComplete }) {
   const [form, setForm] = useState({});
