@@ -784,6 +784,32 @@ const guessCategory = (desc = "", cats, customKeywords = []) => {
   return cats.find(c => c.id === "other")?.id;
 };
 
+// ── Duplicate detection ──────────────────────────────────────────────────────
+const isSameTxn = (a, b) => {
+  if (Math.abs(a.amount - b.amount) > 0.01) return false;
+  // Normalize dates to YYYY-MM-DD for comparison
+  const normDate = (d) => {
+    if (!d) return "";
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+    const m = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+    if (m) { let [,mo,dy,y]=m; if(y.length===2)y="20"+y; return `${y}-${mo.padStart(2,"0")}-${dy.padStart(2,"0")}`; }
+    return d;
+  };
+  if (normDate(a.date) !== normDate(b.date)) return false;
+  // Compare descriptions normalized (strip spaces/special chars)
+  const nd = s => (s||"").toLowerCase().replace(/[^a-z0-9]/g,"").slice(0,20);
+  return nd(a.description) === nd(b.description);
+};
+
+const findDuplicates = (incoming, existing) => {
+  const dupes = [], unique = [];
+  incoming.forEach(t => {
+    if (existing.some(e => isSameTxn(t, e))) dupes.push(t);
+    else unique.push(t);
+  });
+  return { dupes, unique };
+};
+
 // ─── Supabase Config ──────────────────────────────────────────────────────────
 // 👇 Paste your Supabase project URL and anon key here (from supabase.com → Project Settings → API)
 const SUPABASE_URL = "https://mlsnwxuyvfzqqextcems.supabase.co";
@@ -1610,6 +1636,117 @@ function SetupGenie({ onClose, setTab }) {
   );
 }
 
+// ── Duplicate Transaction Review Modal ───────────────────────────────────────
+function DuplicateReviewModal({ review, onConfirm, onCancel }) {
+  const { duplicates, unique } = review;
+  const [skipped, setSkipped] = useState(new Set(duplicates.map(t => t.id)));
+
+  const toggleSkip = (id) => setSkipped(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+
+  const handleConfirm = () => {
+    const toImport = [
+      ...unique,
+      ...duplicates.filter(t => !skipped.has(t.id)),
+    ];
+    onConfirm(toImport);
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000,
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 18,
+        width: "100%", maxWidth: 580, maxHeight: "85vh", display: "flex", flexDirection: "column",
+        boxShadow: "0 24px 64px rgba(0,0,0,0.5)" }}>
+
+        {/* Header */}
+        <div style={{ padding: "22px 24px 16px", borderBottom: `1px solid ${T.border}` }}>
+          <div style={{ fontFamily: "Syne", fontSize: 18, fontWeight: 700, marginBottom: 6 }}>
+            ⚠️ Duplicate Transactions Found
+          </div>
+          <div style={{ fontSize: 13, color: T.muted, lineHeight: 1.6 }}>
+            <span style={{ color: T.coral, fontWeight: 600 }}>{duplicates.length} transaction{duplicates.length !== 1 ? "s" : ""}</span> already exist in your records.
+            Review them below — <strong>checked = skip (don't import), unchecked = import anyway.</strong>
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <button onClick={() => setSkipped(new Set(duplicates.map(t => t.id)))}
+              style={{ fontSize: 12, padding: "4px 12px", borderRadius: 8, cursor: "pointer",
+                background: "rgba(255,255,255,0.06)", border: `1px solid ${T.border}`, color: T.muted, fontFamily: "DM Sans" }}>
+              Skip all duplicates
+            </button>
+            <button onClick={() => setSkipped(new Set())}
+              style={{ fontSize: 12, padding: "4px 12px", borderRadius: 8, cursor: "pointer",
+                background: "rgba(255,255,255,0.06)", border: `1px solid ${T.border}`, color: T.muted, fontFamily: "DM Sans" }}>
+              Import all duplicates
+            </button>
+          </div>
+        </div>
+
+        {/* Duplicate list */}
+        <div style={{ overflowY: "auto", flex: 1, padding: "12px 24px" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ borderBottom: `1px solid ${T.border}` }}>
+                <th style={{ padding: "6px 8px", textAlign: "left", color: T.muted, fontWeight: 500, fontSize: 11, textTransform: "uppercase" }}>Skip?</th>
+                <th style={{ padding: "6px 8px", textAlign: "left", color: T.muted, fontWeight: 500, fontSize: 11, textTransform: "uppercase" }}>Date</th>
+                <th style={{ padding: "6px 8px", textAlign: "left", color: T.muted, fontWeight: 500, fontSize: 11, textTransform: "uppercase" }}>Description</th>
+                <th style={{ padding: "6px 8px", textAlign: "right", color: T.muted, fontWeight: 500, fontSize: 11, textTransform: "uppercase" }}>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {duplicates.map(t => {
+                const isSkipped = skipped.has(t.id);
+                return (
+                  <tr key={t.id} style={{ borderBottom: `1px solid rgba(255,255,255,0.04)`,
+                    opacity: isSkipped ? 0.5 : 1, transition: "opacity 0.15s",
+                    cursor: "pointer" }}
+                    onClick={() => toggleSkip(t.id)}>
+                    <td style={{ padding: "10px 8px" }}>
+                      <div style={{ width: 18, height: 18, borderRadius: 5, border: `2px solid ${isSkipped ? T.teal : T.border}`,
+                        background: isSkipped ? T.teal : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        {isSkipped && <span style={{ color: T.bg, fontSize: 11, fontWeight: 700 }}>✓</span>}
+                      </div>
+                    </td>
+                    <td style={{ padding: "10px 8px", color: T.muted, whiteSpace: "nowrap" }}>{t.date}</td>
+                    <td style={{ padding: "10px 8px", wordBreak: "break-word", maxWidth: 260 }}>{t.description}</td>
+                    <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 600,
+                      color: t.amount >= 0 ? "#4ADE80" : T.coral }}>
+                      {t.amount >= 0 ? "+" : ""}{fmt(t.amount)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: "14px 24px 20px", borderTop: `1px solid ${T.border}`,
+          display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ fontSize: 13, color: T.muted }}>
+            {unique.length} new + {duplicates.filter(t => !skipped.has(t.id)).length} duplicates importing · <span style={{ color: T.coral }}>{skipped.size} skipping</span>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={onCancel}
+              style={{ padding: "8px 16px", borderRadius: 10, background: "rgba(255,255,255,0.05)",
+                color: T.muted, border: `1px solid ${T.border}`, cursor: "pointer", fontFamily: "DM Sans", fontSize: 13 }}>
+              Cancel import
+            </button>
+            <button onClick={handleConfirm}
+              style={{ padding: "10px 20px", borderRadius: 10, background: T.teal, color: T.bg,
+                border: "none", cursor: "pointer", fontFamily: "DM Sans", fontSize: 14, fontWeight: 600 }}>
+              Import {unique.length + duplicates.filter(t => !skipped.has(t.id)).length} transactions
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AuthScreen({ onAuth }) {
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
@@ -1763,6 +1900,7 @@ export default function BudgetApp() {
   const [txnPage, setTxnPage] = useState(0);
   const TXN_PAGE_SIZE = 100;
   const [txnSearch, setTxnSearch] = useState("");
+  const [duplicateReview, setDuplicateReview] = useState(null); // { incoming, duplicates, unique }
   const [txnFilterCat, setTxnFilterCat] = useState("all");
   const [txnFilterType, setTxnFilterType] = useState("all"); // "all" | "debit" | "credit"
   const [sankeyExpanded, setSankeyExpanded] = useState(false);
@@ -2017,8 +2155,16 @@ export default function BudgetApp() {
         }
 
         const valid = parsedRows.filter(r => r.description && !isNaN(r.amount));
-        setTransactions(prev => [...valid, ...prev]);
-        notify(`✓ Imported ${valid.length} transactions!`);
+        // Check for duplicates before committing
+        setTransactions(prev => {
+          const { dupes, unique } = findDuplicates(valid, prev);
+          if (dupes.length > 0) {
+            setDuplicateReview({ incoming: valid, duplicates: dupes, unique, existing: prev });
+            return prev; // hold — user will confirm
+          }
+          notify(`✓ Imported ${valid.length} transactions!`);
+          return [...valid, ...prev];
+        });
       } catch (err) {
         notify("Could not parse file. Please check the format.", "error");
         console.error(err);
@@ -2125,6 +2271,7 @@ export default function BudgetApp() {
     { id: "bills",        icon: CreditCard, label: "Bills"        },
     { id: "schedule",     icon: Calendar,   label: "Schedule"     },
     { id: "compare",      icon: Layers,     label: "Compare"      },
+    { id: "account",      icon: UserCircle, label: "Account"      },
   ];
 
   if (loading) return (
@@ -2305,20 +2452,13 @@ export default function BudgetApp() {
           <span>Setup Genie</span>
         </button>
 
-        {/* User + logout */}
-        <div style={{ paddingTop: 12, borderTop: `1px solid ${T.border}`, marginTop: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", marginBottom: 6 }}>
-            <UserCircle size={18} style={{ color: T.teal, flexShrink: 0 }} />
+        {/* User email pill */}
+        <div style={{ paddingTop: 10, borderTop: `1px solid ${T.border}`, marginTop: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", cursor: "pointer" }}
+            onClick={() => setTab("account")}>
+            <UserCircle size={16} style={{ color: T.teal, flexShrink: 0 }} />
             <span style={{ fontSize: 12, color: T.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user?.email}</span>
           </div>
-          <button className="nav-item" onClick={async () => {
-            await auth.signOut();
-            setUser(null);
-            setAuthScreen("login");
-          }} style={{ color: T.coral, gap: 10 }}>
-            <LogOut size={18} />
-            <span>Sign Out</span>
-          </button>
         </div>
       </aside>
 
@@ -2915,30 +3055,6 @@ export default function BudgetApp() {
                 </div>
               )}
 
-              {/* Built-in default keywords (read-only, collapsible) */}
-              <details>
-                <summary style={{ cursor: "pointer", color: T.muted, fontSize: 13, userSelect: "none", padding: "8px 0" }}>
-                  View {DEFAULT_KEYWORDS.length} built-in keyword rules (read-only)
-                </summary>
-                <div className="card" style={{ padding: 0, overflow: "hidden", marginTop: 10 }}>
-                  <div style={{ overflowX: "auto", maxHeight: 320, overflowY: "auto" }}>
-                    <table>
-                      <thead><tr><th>Keyword</th><th>Category</th></tr></thead>
-                      <tbody>
-                        {DEFAULT_KEYWORDS.map(kw => {
-                          const cat = categories.find(c => c.id === kw.categoryId);
-                          return (
-                            <tr key={kw.id}>
-                              <td><span style={{ fontFamily: "monospace", background: "rgba(255,255,255,0.06)", padding: "2px 8px", borderRadius: 6, fontSize: 12 }}>{kw.keyword}</span></td>
-                              <td><CategoryBadge category={cat} /></td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </details>
             </div>
           </div>
         )}
@@ -3431,6 +3547,127 @@ export default function BudgetApp() {
         )}
 
 
+      {/* ─ Account ─ */}
+      {tab === "account" && (
+        <div className="fade-in">
+          <h1 style={{ fontFamily: "Syne", fontSize: 26, fontWeight: 700, marginBottom: 4 }}>Account</h1>
+          <p style={{ color: T.muted, fontSize: 14, marginBottom: 28 }}>Manage your account and preferences</p>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 680 }}>
+
+            {/* Profile card */}
+            <div className="card">
+              <div style={{ fontFamily: "Syne", fontWeight: 600, fontSize: 16, marginBottom: 16 }}>Profile</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: `1px solid ${T.border}` }}>
+                  <span style={{ fontSize: 13, color: T.muted }}>Email</span>
+                  <span style={{ fontSize: 13, fontWeight: 500 }}>{user?.email}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: `1px solid ${T.border}` }}>
+                  <span style={{ fontSize: 13, color: T.muted }}>Account type</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, textTransform: "capitalize" }}>{accountType}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0" }}>
+                  <span style={{ fontSize: 13, color: T.muted }}>Storage</span>
+                  <span style={{ fontSize: 13, color: dbStatus === "connected" ? "#4ADE80" : T.muted }}>
+                    {dbStatus === "connected" ? "● Supabase connected" : "● Local only"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Settings card */}
+            <div className="card">
+              <div style={{ fontFamily: "Syne", fontWeight: 600, fontSize: 16, marginBottom: 4 }}>Settings</div>
+              <div style={{ fontSize: 13, color: T.muted, marginBottom: 16 }}>Configure how the app behaves</div>
+
+              {/* Budget Setup */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderBottom: `1px solid ${T.border}` }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 500 }}>Budget Setup Wizard</div>
+                  <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>Re-run the monthly budget setup tool</div>
+                </div>
+                <button className="btn btn-ghost" style={{ fontSize: 13 }} onClick={() => setModal({ type: "setupWizard" })}>
+                  Open wizard
+                </button>
+              </div>
+
+              {/* Setup Genie */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderBottom: `1px solid ${T.border}` }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 500 }}>✨ Setup Genie</div>
+                  <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>Replay the app tour</div>
+                </div>
+                <button className="btn btn-ghost" style={{ fontSize: 13 }} onClick={() => setShowSetupGenie(true)}>
+                  Open tour
+                </button>
+              </div>
+
+              {/* Built-in Keywords — collapsible */}
+              <div style={{ padding: "14px 0" }}>
+                <details>
+                  <summary style={{ cursor: "pointer", userSelect: "none", display: "flex", justifyContent: "space-between", alignItems: "center", listStyle: "none" }}>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 500 }}>View Built-In Keywords</div>
+                      <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>{DEFAULT_KEYWORDS.length} rules that auto-categorize common merchants</div>
+                    </div>
+                    <span style={{ fontSize: 12, color: T.teal, flexShrink: 0, marginLeft: 12 }}>View ▾</span>
+                  </summary>
+                  <div style={{ marginTop: 14 }}>
+                    {/* Group by category */}
+                    {(() => {
+                      const groups = {};
+                      DEFAULT_KEYWORDS.forEach(kw => {
+                        const cat = sortedCategories.find(c => c.id === kw.categoryId);
+                        const label = cat?.name || kw.categoryId;
+                        if (!groups[label]) groups[label] = { color: cat?.color || T.muted, kws: [] };
+                        groups[label].kws.push(kw.keyword);
+                      });
+                      return Object.entries(groups).sort(([a],[b]) => a.localeCompare(b)).map(([label, { color, kws }]) => (
+                        <div key={label} style={{ marginBottom: 14 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: "50%", background: color, display: "inline-block" }} />
+                            <span style={{ fontSize: 11, fontWeight: 600, color: T.muted, textTransform: "uppercase", letterSpacing: 0.8 }}>{label}</span>
+                          </div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 5, paddingLeft: 14 }}>
+                            {kws.map(kw => (
+                              <span key={kw} style={{ fontFamily: "monospace", fontSize: 11, background: "rgba(255,255,255,0.06)", padding: "2px 8px", borderRadius: 6, color: T.text }}>{kw}</span>
+                            ))}
+                          </div>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </details>
+              </div>
+            </div>
+
+            {/* Danger zone */}
+            <div className="card" style={{ borderColor: "rgba(248,113,113,0.3)" }}>
+              <div style={{ fontFamily: "Syne", fontWeight: 600, fontSize: 16, marginBottom: 4, color: T.coral }}>Sign Out</div>
+              <div style={{ fontSize: 13, color: T.muted, marginBottom: 16 }}>You'll need to sign in again to access your data.</div>
+              <button className="btn btn-danger" onClick={async () => { await auth.signOut(); setUser(null); setAuthScreen("login"); }}>
+                Sign out of {user?.email}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ── Duplicate Review ── */}
+      {duplicateReview && (
+        <DuplicateReviewModal
+          review={duplicateReview}
+          onConfirm={(toImport) => {
+            setTransactions(prev => [...toImport, ...duplicateReview.existing]);
+            notify(`✓ Imported ${toImport.length} transactions (${duplicateReview.duplicates.length - toImport.filter(t => duplicateReview.duplicates.some(d => d.id === t.id)).length} duplicates skipped)`);
+            setDuplicateReview(null);
+          }}
+          onCancel={() => setDuplicateReview(null)}
+        />
+      )}
+
       {/* ── Setup Genie ── */}
       {showSetupGenie && (
         <SetupGenie onClose={() => setShowSetupGenie(false)} setTab={setTab} />
@@ -3845,8 +4082,15 @@ function ColumnMapper({ modal, categories, customKeywords, setTransactions, noti
       return { id: `t_${Date.now()}_${i}`, date: cols[map.date] || new Date().toISOString().split("T")[0], description: desc.trim(), amount, categoryId: guessCategory(desc, categories, customKeywords), note: "" };
     }).filter(r => r.description && !isNaN(r.amount));
 
-    setTransactions(prev => [...rows, ...prev]);
-    notify(`✓ Imported ${rows.length} transactions!`);
+    setTransactions(prev => {
+      const { dupes, unique } = findDuplicates(rows, prev);
+      if (dupes.length > 0) {
+        setDuplicateReview({ incoming: rows, duplicates: dupes, unique, existing: prev });
+        return prev; // hold — user will confirm
+      }
+      notify(`✓ Imported ${rows.length} transactions!`);
+      return [...rows, ...prev];
+    });
     close();
   };
 
@@ -3931,8 +4175,11 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
 
   const submit = () => {
     if (modal.type === "addCategory") {
-      if (!form.name) return;
-      setCategories(prev => [...prev, { id: `c_${Date.now()}`, name: form.name, color: form.color || CATEGORY_COLORS[prev.length % CATEGORY_COLORS.length], budget: parseFloat(form.budget) || 0, type: form.type || "expense" }]);
+      const catName = form.name?.trim();
+      if (!catName) return;
+      // Use template id if selected, otherwise generate unique id
+      const catId = (form.nameSource && form.nameSource !== "custom") ? form.nameSource : `c_${Date.now()}`;
+      setCategories(prev => [...prev, { id: catId, name: catName, color: form.color || CATEGORY_COLORS[prev.length % CATEGORY_COLORS.length], budget: parseFloat(form.budget) || 0, type: form.type || "expense" }]);
       notify("Category added!");
     } else if (modal.type === "editCategory") {
       setCategories(prev => prev.map(c => c.id === modal.cat.id ? {
@@ -3996,20 +4243,59 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {modal.type === "addCategory" && <>
-            <input className="input" placeholder="Category name (e.g. Groceries)" onChange={e => set("name", e.target.value)} />
-            <select className="input" onChange={e => set("type", e.target.value)}>
-              <option value="expense">Expense</option>
-              <option value="income">Income</option>
-              <option value="savings">Savings</option>
-            </select>
-            <input className="input" type="number" placeholder="Monthly budget (optional)" onChange={e => set("budget", e.target.value)} />
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {CATEGORY_COLORS.map(c => (
-                <button key={c} onClick={() => set("color", c)} style={{ width: 28, height: 28, borderRadius: "50%", background: c, border: form.color === c ? `3px solid ${T.white}` : "3px solid transparent", cursor: "pointer" }} />
-              ))}
-            </div>
-          </>}
+          {modal.type === "addCategory" && (() => {
+            // Build grouped list from templates — deduplicated
+            const templateOptions = [
+              ...CATEGORY_TEMPLATES.flatMap(g => g.items),
+              ...BUSINESS_CATEGORY_TEMPLATES.flatMap(g => g.items),
+            ].filter((c, i, arr) => arr.findIndex(x => x.id === c.id) === i);
+            const existingIds = new Set((categories || []).map(c => c.id));
+            const available = templateOptions.filter(c => !existingIds.has(c.id));
+            const isCustom = form.nameSource === "custom" || !available.length;
+            return (
+              <>
+                {/* Category name — dropdown + optional custom input */}
+                <div>
+                  <div style={{ fontSize: 12, color: T.muted, marginBottom: 5 }}>Category</div>
+                  <select className="input" value={form.nameSource || ""}
+                    onChange={e => {
+                      const val = e.target.value;
+                      set("nameSource", val);
+                      if (val === "custom") { set("name", ""); set("color", null); }
+                      else {
+                        const tmpl = available.find(c => c.id === val);
+                        if (tmpl) { set("name", tmpl.name); set("color", tmpl.color); set("type", tmpl.type); }
+                      }
+                    }}>
+                    <option value="">— Choose a category —</option>
+                    {available.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    <option value="custom">✏️ Custom (enter your own)</option>
+                  </select>
+                </div>
+
+                {/* Custom name input — only shown when "custom" selected */}
+                {(form.nameSource === "custom") && (
+                  <input className="input" placeholder="Category name (e.g. Haircuts)"
+                    value={form.name || ""}
+                    onChange={e => set("name", e.target.value)} />
+                )}
+
+                <select className="input" value={form.type || "expense"} onChange={e => set("type", e.target.value)}>
+                  <option value="expense">Expense</option>
+                  <option value="income">Income</option>
+                  <option value="savings">Savings</option>
+                </select>
+                <input className="input" type="number" placeholder="Monthly budget (optional)" onChange={e => set("budget", e.target.value)} />
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {CATEGORY_COLORS.map(c => (
+                    <button key={c} onClick={() => set("color", c)}
+                      style={{ width: 28, height: 28, borderRadius: "50%", background: c,
+                        border: (form.color || null) === c ? `3px solid ${T.white}` : "3px solid transparent", cursor: "pointer" }} />
+                  ))}
+                </div>
+              </>
+            );
+          })()}
 
           {modal.type === "editCategory" && <>
             <div style={{ fontSize: 12, color: T.muted, marginBottom: 4 }}>Category Name</div>
