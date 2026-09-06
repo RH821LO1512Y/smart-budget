@@ -1555,7 +1555,7 @@ const GENIE_STEPS = [
     subtitle: "Select up to 3 months to see exactly where your spending changed — great for spotting patterns.",
     tip: "💡 Use the date range picker in the sidebar to filter any view to a custom period." },
   { emoji: "🎉", title: "You're all set!", tab: "dashboard",
-    subtitle: "Upload your first bank statement to bring your dashboard to life. Re-open this guide anytime from ✨ Setup Genie in the sidebar.",
+    subtitle: "Upload your first bank statement to bring your dashboard to life. Re-open this guide anytime from the Account page.",
     tip: null },
 ];
 
@@ -2399,30 +2399,6 @@ export default function BudgetApp() {
           </div>
         </div>
 
-        <div style={{ padding: "16px 8px 0", borderTop: `1px solid ${T.border}` }}>
-          <button className="btn btn-ghost" style={{ width: "100%", fontSize: 12, marginBottom: 12, justifyContent: "center" }}
-            onClick={() => setModal({ type: "setupWizard" })}>
-            ⚙️ Budget Setup
-          </button>
-          <div style={{ fontSize: 11, color: T.muted }}>Storage</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
-            {dbStatus === "connected" && <>
-              <div style={{ width: 7, height: 7, borderRadius: "50%", background: T.green }} className="pulse" />
-              <span style={{ fontSize: 11, color: T.green }}>Supabase connected</span>
-            </>}
-            {dbStatus === "local" && <>
-              <div style={{ width: 7, height: 7, borderRadius: "50%", background: T.yellow }} />
-              <span style={{ fontSize: 11, color: T.yellow }}>Saved locally</span>
-            </>}
-            {dbStatus === "checking" && <>
-              <div style={{ width: 7, height: 7, borderRadius: "50%", background: T.muted }} className="pulse" />
-              <span style={{ fontSize: 11, color: T.muted }}>Connecting...</span>
-            </>}
-          </div>
-          {dbStatus === "local" && !isSupabaseReady() && (
-            <div style={{ fontSize: 10, color: T.muted, marginTop: 4, lineHeight: 1.4 }}>Add your Supabase keys<br/>to sync across devices</div>
-          )}
-        </div>
         {/* Account switcher — only shown for business/both users */}
         {(accountType === "business" || accountType === "both") && (
           <div style={{ margin: "12px 0", padding: "10px 8px", background: "rgba(255,255,255,0.04)", borderRadius: 10 }}>
@@ -2444,13 +2420,8 @@ export default function BudgetApp() {
           </div>
         )}
 
-        {/* Setup Genie button */}
-        <button className="nav-item" onClick={() => setShowSetupGenie(true)}
-          style={{ marginTop: "auto", color: T.muted, gap: 10, borderRadius: 10,
-            background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}` }}>
-          <span style={{ fontSize: 16 }}>✨</span>
-          <span>Setup Genie</span>
-        </button>
+        {/* Flex spacer */}
+        <div style={{ flex: 1 }} />
 
         {/* User email pill */}
         <div style={{ paddingTop: 10, borderTop: `1px solid ${T.border}`, marginTop: 6 }}>
@@ -3325,9 +3296,7 @@ export default function BudgetApp() {
             </div>
           </div>
         )}
-      </main>
-
-      {/* ─ Modals ─ */}
+      
         {tab === "compare" && (
           <div className="fade-in">
             <h1 style={{ fontFamily: "Syne", fontSize: 26, fontWeight: 700, marginBottom: 4 }}>Month Comparison</h1>
@@ -3654,6 +3623,10 @@ export default function BudgetApp() {
           </div>
         </div>
       )}
+
+      </main>
+
+      {/* ─ Modals ─ */}
 
       {/* ── Duplicate Review ── */}
       {duplicateReview && (
