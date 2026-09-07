@@ -9,8 +9,14 @@ import { Upload, DollarSign, TrendingUp, TrendingDown, CreditCard, Calendar, Tag
 // ─── Google Fonts ─────────────────────────────────────────────────────────────
 const fontLink = document.createElement("link");
 fontLink.rel = "stylesheet";
-fontLink.href = "https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap";
+fontLink.href = "https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap";
 document.head.appendChild(fontLink);
+
+// Material Symbols (Google Icons)
+const iconLink = document.createElement("link");
+iconLink.rel = "stylesheet";
+iconLink.href = "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block";
+document.head.appendChild(iconLink);
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
 const T = {
@@ -28,6 +34,14 @@ const T = {
   muted: "#8B86B0",
   white: "#FFFFFF",
 };
+
+// Material Symbols icon helper — use anywhere in place of emoji
+const MIcon = ({ name, size = 20, style = {} }) => (
+  <span className="material-symbols-outlined"
+    style={{ fontSize: size, lineHeight: 1, verticalAlign: "middle", userSelect: "none", ...style }}>
+    {name}
+  </span>
+);
 
 const CATEGORY_COLORS = [T.coral, T.teal, T.yellow, T.purple, T.green, T.blue, "#FB923C", "#F472B6", "#34D399", "#FCD34D"];
 
@@ -53,7 +67,7 @@ const DEFAULT_CATEGORIES = [
   // ── Lifestyle ─────────────────────────────────────────────────
   { id: "personal_care",name: "Personal Care",    color: "#F472B6", budget: 150,  type: "expense"  },
   { id: "entertainment",name: "Entertainment",    color: "#A78BFA", budget: 150,  type: "expense"  },
-  { id: "baby",         name: "Baby",             color: "#FDE68A", budget: 150,  type: "expense"  },
+  { id: "kids",         name: "kids",             color: "#FDE68A", budget: 150,  type: "expense"  },
   { id: "pets",         name: "Pets",             color: "#A3E635", budget: 100,  type: "expense"  },
   { id: "contribution", name: "Contribution",     color: "#C4B5FD", budget: 100,  type: "expense"  },
   { id: "notary",       name: "Notary",           color: "#94A3B8", budget: 0,    type: "expense"  },
@@ -147,8 +161,8 @@ const DEFAULT_KEYWORDS = [
   { id: "kw_disney",     keyword: "disney+",           categoryId: "entertainment" },
   { id: "kw_sub",        keyword: "subscription",      categoryId: "entertainment" },
   { id: "kw_movie",      keyword: "movie",             categoryId: "entertainment" },
-  // Baby
-  { id: "kw_carters",    keyword: "carters",           categoryId: "baby"          },
+  // kids
+  { id: "kw_carters",    keyword: "carters",           categoryId: "kids"          },
   // Pets
   { id: "kw_rainwalk",   keyword: "rainwalk",          categoryId: "pets"          },
   { id: "kw_petco",      keyword: "petco",             categoryId: "pets"          },
@@ -687,7 +701,7 @@ const DEFAULT_KEYWORDS = [
 const BANK_PRESETS = {
   bofa: {
     name: "Bank of America",
-    logo: "🏦",
+    logo: "savings",
     // Header names (lowercase matched)
     date: "posted date",
     desc: "payee",
@@ -698,7 +712,7 @@ const BANK_PRESETS = {
   },
   chase: {
     name: "Chase",
-    logo: "🏛️",
+    logo: "account_balance",
     date: "posting date",
     desc: "description",
     amount: "amount",
@@ -708,7 +722,7 @@ const BANK_PRESETS = {
   },
   wellsfargo: {
     name: "Wells Fargo",
-    logo: "🐎",
+    logo: "horse",
     // No headers — positional (0-indexed)
     date: 0,       // Col A
     amount: 1,     // Col B
@@ -941,6 +955,7 @@ const localLoad = () => { try { const d = localStorage.getItem(localKey()); retu
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const css = `
+  .material-symbols-outlined { font-family: 'Material Symbols Outlined'; font-weight: normal; font-style: normal; display: inline-block; direction: ltr; speak: none; -webkit-font-smoothing: antialiased; }
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: ${T.bg}; color: ${T.text}; font-family: 'DM Sans', sans-serif; }
@@ -1018,6 +1033,8 @@ const css = `
   }
 
   /* Small mobile (≤480px): single column everything */
+  .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24; }
+
   @media (max-width: 480px) {
     .main-content { padding: 10px !important; }
     .card { padding: 12px; border-radius: 10px; }
@@ -1031,6 +1048,13 @@ const css = `
 const StyleTag = () => <style dangerouslySetInnerHTML={{ __html: css }} />;
 
 // ─── Components ───────────────────────────────────────────────────────────────
+
+const Icon = ({ name, size = 20, color, style: s = {} }) => (
+  <span className="material-symbols-outlined"
+    style={{ fontSize: size, lineHeight: 1, verticalAlign: "middle", color, userSelect: "none", ...s }}>
+    {name}
+  </span>
+);
 
 const StatCard = ({ label, value, icon: Icon, color, sub }) => (
   <div className="card fade-in" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1057,13 +1081,13 @@ const CategoryBadge = ({ category }) => (
 const REQUIRED_CAT_IDS = new Set(["income", "other"]);
 
 const CATEGORY_TEMPLATES = [
-  { group: "💰 Income",
+  { group: "Income",
     items: [
       { id: "income",       name: "Income",          color: "#6BCB77", budget: 0,    type: "income"  },
       { id: "savings",      name: "Savings",          color: "#FCD34D", budget: 0,    type: "savings" },
     ]
   },
-  { group: "🏠 Housing",
+  { group: "Housing",
     items: [
       { id: "housing",      name: "Rent / Mortgage",  color: "#A78BFA", budget: 0,    type: "expense" },
       { id: "utilities",    name: "Utilities",         color: "#60A5FA", budget: 0,    type: "expense" },
@@ -1071,14 +1095,14 @@ const CATEGORY_TEMPLATES = [
       { id: "phone",        name: "Phone",             color: "#FCA5A5", budget: 0,    type: "expense" },
     ]
   },
-  { group: "🍔 Food",
+  { group: "Food",
     items: [
       { id: "food",         name: "Food & Dining",    color: "#4ECDC4", budget: 0,    type: "expense" },
       { id: "grocery",      name: "Grocery",          color: "#34D399", budget: 0,    type: "expense" },
       { id: "coffee",       name: "Coffee",            color: "#C4A882", budget: 0,    type: "expense" },
     ]
   },
-  { group: "🚗 Transport",
+  { group: "Transport",
     items: [
       { id: "transport",    name: "Transportation",   color: "#FFE66D", budget: 0,    type: "expense" },
       { id: "gas",          name: "Gas / Fuel",        color: "#FCA5A5", budget: 0,    type: "expense" },
@@ -1086,7 +1110,7 @@ const CATEGORY_TEMPLATES = [
       { id: "parking",      name: "Parking / Tolls",   color: "#94A3B8", budget: 0,    type: "expense" },
     ]
   },
-  { group: "❤️ Health",
+  { group: "Health",
     items: [
       { id: "health_ins",   name: "Health Insurance", color: "#6BCB77", budget: 0,    type: "expense" },
       { id: "healthcare",   name: "Medical / Dental",  color: "#F87171", budget: 0,    type: "expense" },
@@ -1094,14 +1118,14 @@ const CATEGORY_TEMPLATES = [
       { id: "fitness",      name: "Fitness / Gym",     color: "#4ADE80", budget: 0,    type: "expense" },
     ]
   },
-  { group: "💳 Debt & Credit",
+  { group: "Debt & Credit",
     items: [
       { id: "credit_cards", name: "Credit Cards",     color: "#3B82F6", budget: 0,    type: "expense" },
       { id: "loans_debt",   name: "Loans",             color: "#F59E0B", budget: 0,    type: "expense" },
       { id: "student_loan", name: "Student Loans",     color: "#60A5FA", budget: 0,    type: "expense" },
     ]
   },
-  { group: "✨ Lifestyle",
+  { group: "Lifestyle",
     items: [
       { id: "entertainment",name: "Entertainment",    color: "#A78BFA", budget: 0,    type: "expense" },
       { id: "subscriptions",name: "Subscriptions",    color: "#F472B6", budget: 0,    type: "expense" },
@@ -1109,24 +1133,24 @@ const CATEGORY_TEMPLATES = [
       { id: "personal_care",name: "Personal Care",    color: "#F472B6", budget: 0,    type: "expense" },
       { id: "travel",       name: "Travel",            color: "#67E8F9", budget: 0,    type: "expense" },
       { id: "pets",         name: "Pets",              color: "#A3E635", budget: 0,    type: "expense" },
-      { id: "kids",         name: "Kids / Baby",       color: "#FDE68A", budget: 0,    type: "expense" },
+      { id: "kids",         name: "Kids / kids",       color: "#FDE68A", budget: 0,    type: "expense" },
       { id: "education",    name: "Education",         color: "#6BCB77", budget: 0,    type: "expense" },
     ]
   },
-  { group: "🙏 Giving",
+  { group: "Giving",
     items: [
       { id: "charity",      name: "Charity / Donations",color: "#C4B5FD",budget: 0,  type: "expense" },
       { id: "contribution", name: "Church / Tithe",    color: "#C4B5FD", budget: 0,    type: "expense" },
     ]
   },
-  { group: "💼 Work",
+  { group: "Work",
     items: [
       { id: "work",         name: "Work Expenses",     color: "#94A3B8", budget: 0,    type: "expense" },
       { id: "notary",       name: "Notary",            color: "#94A3B8", budget: 0,    type: "expense" },
       { id: "business",     name: "Business",          color: "#60A5FA", budget: 0,    type: "expense" },
     ]
   },
-  { group: "📦 Other",
+  { group: "Other",
     items: [
       { id: "other",        name: "Other",             color: "#8B86B0", budget: 0,    type: "expense" },
     ]
@@ -1136,21 +1160,21 @@ const CATEGORY_TEMPLATES = [
 // Always-included (can't be deselected)
 // ── Business category templates ───────────────────────────────────────────────
 const BUSINESS_CATEGORY_TEMPLATES = [
-  { group: "💵 Revenue",
+  { group: "Revenue",
     items: [
       { id: "biz_revenue",    name: "Revenue / Sales",    color: "#4ADE80", budget: 0, type: "income",  account: "business" },
       { id: "biz_services",   name: "Services Income",    color: "#6BCB77", budget: 0, type: "income",  account: "business" },
       { id: "biz_other_inc",  name: "Other Income",       color: "#A3E635", budget: 0, type: "income",  account: "business" },
     ]
   },
-  { group: "🏭 Cost of Goods",
+  { group: "Cost of Goods",
     items: [
       { id: "biz_cogs",       name: "Cost of Goods Sold", color: "#F59E0B", budget: 0, type: "expense", account: "business" },
       { id: "biz_inventory",  name: "Inventory",          color: "#FCA5A5", budget: 0, type: "expense", account: "business" },
       { id: "biz_supplies",   name: "Supplies",           color: "#FDE68A", budget: 0, type: "expense", account: "business" },
     ]
   },
-  { group: "🏢 Operating Expenses",
+  { group: "Operating Expenses",
     items: [
       { id: "biz_rent",       name: "Office / Space Rent",color: "#A78BFA", budget: 0, type: "expense", account: "business" },
       { id: "biz_utilities",  name: "Utilities",          color: "#60A5FA", budget: 0, type: "expense", account: "business" },
@@ -1160,40 +1184,40 @@ const BUSINESS_CATEGORY_TEMPLATES = [
       { id: "biz_equipment",  name: "Equipment",          color: "#94A3B8", budget: 0, type: "expense", account: "business" },
     ]
   },
-  { group: "👥 People",
+  { group: "People",
     items: [
       { id: "biz_payroll",    name: "Payroll / Salaries", color: "#3B82F6", budget: 0, type: "expense", account: "business" },
       { id: "biz_contractors",name: "Contractors / 1099", color: "#60A5FA", budget: 0, type: "expense", account: "business" },
       { id: "biz_benefits",   name: "Benefits",           color: "#A78BFA", budget: 0, type: "expense", account: "business" },
     ]
   },
-  { group: "📣 Marketing & Sales",
+  { group: "Marketing & Sales",
     items: [
       { id: "biz_ads",        name: "Advertising / Ads",  color: "#FB923C", budget: 0, type: "expense", account: "business" },
       { id: "biz_marketing",  name: "Marketing",          color: "#F59E0B", budget: 0, type: "expense", account: "business" },
       { id: "biz_website",    name: "Website / Hosting",  color: "#34D399", budget: 0, type: "expense", account: "business" },
     ]
   },
-  { group: "✈️ Travel & Meals",
+  { group: "Travel & Meals",
     items: [
       { id: "biz_travel",     name: "Business Travel",    color: "#67E8F9", budget: 0, type: "expense", account: "business" },
       { id: "biz_meals",      name: "Meals & Entertainment",color: "#4ECDC4",budget: 0, type: "expense", account: "business" },
     ]
   },
-  { group: "⚖️ Professional",
+  { group: "Professional",
     items: [
       { id: "biz_legal",      name: "Legal / Accounting", color: "#C4B5FD", budget: 0, type: "expense", account: "business" },
       { id: "biz_consulting", name: "Consulting",         color: "#A78BFA", budget: 0, type: "expense", account: "business" },
     ]
   },
-  { group: "🏦 Finance & Tax",
+  { group: "Finance & Tax",
     items: [
       { id: "biz_taxes",      name: "Taxes",              color: "#F87171", budget: 0, type: "expense", account: "business" },
       { id: "biz_loans",      name: "Business Loans",     color: "#F59E0B", budget: 0, type: "expense", account: "business" },
       { id: "biz_fees",       name: "Bank / Card Fees",   color: "#94A3B8", budget: 0, type: "expense", account: "business" },
     ]
   },
-  { group: "📦 Other",
+  { group: "Other",
     items: [
       { id: "biz_other",      name: "Other Business",     color: "#8B86B0", budget: 0, type: "expense", account: "business" },
     ]
@@ -1206,21 +1230,21 @@ function AccountTypeScreen({ onConfirm }) {
   const options = [
     {
       id: "personal",
-      emoji: "🏠",
+      icon: "home",
       title: "Personal",
       desc: "Track household income, bills, and everyday spending.",
       color: T.teal,
     },
     {
       id: "business",
-      emoji: "💼",
+      icon: "business_center",
       title: "Business",
       desc: "Track revenue, expenses, payroll, and P&L for your business.",
       color: "#A78BFA",
     },
     {
       id: "both",
-      emoji: "⚡",
+      icon: "bolt",
       title: "Both",
       desc: "I'm an entrepreneur — I want to track personal and business finances together.",
       color: "#F59E0B",
@@ -1249,7 +1273,7 @@ function AccountTypeScreen({ onConfirm }) {
                 border: `2px solid ${selected === opt.id ? opt.color : T.border}`,
                 transition: "all 0.2s",
               }}>
-              <span style={{ fontSize: 28, lineHeight: 1 }}>{opt.emoji}</span>
+              <MIcon name={opt.icon} size={32} color={selected === opt.id ? (options.find(o=>o.id===opt.id)?.color||T.teal) : T.muted} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontFamily: "Syne", fontWeight: 700, fontSize: 16, color: selected === opt.id ? opt.color : T.text, marginBottom: 4 }}>
                   {opt.title}
@@ -1337,7 +1361,7 @@ function CategoryPicker({ accountType = "personal", onConfirm }) {
         {/* Tabs for "both" mode */}
         {isBoth && (
           <div style={{ display: "flex", gap: 0, marginBottom: 24, background: "rgba(255,255,255,0.04)", borderRadius: 10, padding: 3, maxWidth: 320, margin: "0 auto 24px" }}>
-            {[{id:"personal",label:"🏠 Personal"},{id:"business",label:"💼 Business"}].map(t => (
+            {[{id:"personal",label:"Personal"},{id:"business",label:"Business"}].map(t => (
               <button key={t.id} onClick={() => setPickerTab(t.id)}
                 style={{ flex: 1, padding: "8px 0", border: "none", borderRadius: 8, cursor: "pointer",
                   fontFamily: "DM Sans", fontSize: 13, fontWeight: 500, transition: "all 0.2s",
@@ -1536,25 +1560,25 @@ function KeywordRulesScreen({ categories, initialKeywords, onConfirm }) {
 
 // ── Setup Genie ───────────────────────────────────────────────────────────────
 const GENIE_STEPS = [
-  { emoji: "✨", title: "Welcome to $martBudget!", tab: null,
+  { icon: "auto_awesome", title: "Welcome to $martBudget!", tab: null,
     subtitle: "Your personal financial co-pilot. Let's take a quick tour — each step will take you right to the feature it's describing.",
     tip: null },
-  { emoji: "📤", title: "Import your bank statement", tab: "transactions",
+  { icon: "upload", title: "Import your bank statement", tab: "transactions",
     subtitle: "Drag in a CSV or Excel file from your bank. The app auto-detects Wells Fargo, Chase, Bank of America, and most other formats.",
-    tip: "💡 You can also click Upload File in the top right of this page." },
-  { emoji: "🏷️", title: "Transactions get sorted automatically", tab: "transactions",
+    tip: "You can also click Upload File in the top right of this page." },
+  { icon: "sell", title: "Transactions get sorted automatically", tab: "transactions",
     subtitle: "Your keyword rules match descriptions to categories. Anything unmatched lands in 'Other' — just reassign it from the dropdown.",
-    tip: "💡 The more keywords you set up, the less manual sorting you'll need." },
-  { emoji: "📊", title: "Set your monthly budgets", tab: "categories",
+    tip: "The more keywords you set up, the less manual sorting you'll need." },
+  { icon: "bar_chart", title: "Set your monthly budgets", tab: "categories",
     subtitle: "Click the ✏️ pencil icon on any category card to set a monthly budget. The progress bar fills as you spend.",
-    tip: "💡 Click any card to see all transactions inside that category." },
-  { emoji: "💰", title: "Track your savings goals", tab: "savings",
+    tip: "Click any card to see all transactions inside that category." },
+  { icon: "savings", title: "Track your savings goals", tab: "savings",
     subtitle: "Create goals like an emergency fund or vacation fund. Link transactions to a goal to track real progress.",
-    tip: "💡 The Savings Trend on the Dashboard shows your cumulative savings over time." },
-  { emoji: "📅", title: "Compare months side by side", tab: "compare",
+    tip: "The Savings Trend on the Dashboard shows your cumulative savings over time." },
+  { icon: "calendar_month", title: "Compare months side by side", tab: "compare",
     subtitle: "Select up to 3 months to see exactly where your spending changed — great for spotting patterns.",
-    tip: "💡 Use the date range picker in the sidebar to filter any view to a custom period." },
-  { emoji: "🎉", title: "You're all set!", tab: "dashboard",
+    tip: "Use the date range picker in the sidebar to filter any view to a custom period." },
+  { icon: "celebration", title: "You're all set!", tab: "dashboard",
     subtitle: "Upload your first bank statement to bring your dashboard to life. Re-open this guide anytime from the Account page.",
     tip: null },
 ];
@@ -1600,7 +1624,9 @@ function SetupGenie({ onClose, setTab }) {
               <span>→</span> Navigating to: <strong style={{ textTransform: "capitalize" }}>{s.tab}</strong>
             </div>
           )}
-          <div style={{ fontSize: 56, marginBottom: 16, lineHeight: 1 }}>{s.emoji}</div>
+          <div style={{ marginBottom: 16 }}>
+            <MIcon name={s.icon} size={56} color={T.teal} />
+          </div>
           <div style={{ fontFamily: "Syne", fontSize: 22, fontWeight: 700, marginBottom: 12, color: T.text }}>
             {s.title}
           </div>
@@ -1609,8 +1635,10 @@ function SetupGenie({ onClose, setTab }) {
           </div>
           {s.tip && (
             <div style={{ background: `${T.teal}12`, border: `1px solid ${T.teal}30`, borderRadius: 10,
-              padding: "10px 14px", fontSize: 13, color: T.teal, lineHeight: 1.5 }}>
-              {s.tip}
+              padding: "10px 14px", fontSize: 13, color: T.teal, lineHeight: 1.5,
+              display: "flex", gap: 8, alignItems: "flex-start" }}>
+              <MIcon name="info" size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+              <span>{s.tip}</span>
             </div>
           )}
         </div>
@@ -1628,7 +1656,7 @@ function SetupGenie({ onClose, setTab }) {
             style={{ padding: "10px 24px", borderRadius: 10,
               background: isLast ? T.teal : "#A78BFA",
               color: T.bg, border: "none", cursor: "pointer", fontFamily: "DM Sans", fontSize: 14, fontWeight: 600 }}>
-            {isLast ? "Get started! 🚀" : "Next →"}
+            {isLast ? "Get started!" : "Next →"}
           </button>
         </div>
       </div>
@@ -1664,8 +1692,8 @@ function DuplicateReviewModal({ review, onConfirm, onCancel }) {
 
         {/* Header */}
         <div style={{ padding: "22px 24px 16px", borderBottom: `1px solid ${T.border}` }}>
-          <div style={{ fontFamily: "Syne", fontSize: 18, fontWeight: 700, marginBottom: 6 }}>
-            ⚠️ Duplicate Transactions Found
+          <div style={{ fontFamily: "Syne", fontSize: 18, fontWeight: 700, marginBottom: 6, display: "flex", alignItems: "center", gap: 8 }}>
+            <MIcon name="warning" size={22} color={T.coral} /> Duplicate Transactions Found
           </div>
           <div style={{ fontSize: 13, color: T.muted, lineHeight: 1.6 }}>
             <span style={{ color: T.coral, fontWeight: 600 }}>{duplicates.length} transaction{duplicates.length !== 1 ? "s" : ""}</span> already exist in your records.
@@ -1903,6 +1931,9 @@ export default function BudgetApp() {
   const [duplicateReview, setDuplicateReview] = useState(null); // { incoming, duplicates, unique }
   const [txnFilterCat, setTxnFilterCat] = useState("all");
   const [txnFilterType, setTxnFilterType] = useState("all"); // "all" | "debit" | "credit"
+  const [txnDateFrom, setTxnDateFrom] = useState("");
+  const [txnDateTo, setTxnDateTo] = useState("");
+  const MAX_TXN_PAGES = 6;
   const [sankeyExpanded, setSankeyExpanded] = useState(false);
   const [compareMonths, setCompareMonths] = useState([]); // up to 3 "YYYY-MM" strings
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
@@ -2553,10 +2584,10 @@ export default function BudgetApp() {
                 <div className="card" style={{ gridColumn: "1 / -1", transition: "all 0.3s ease" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, cursor: "pointer" }}
                     onClick={() => setSankeyExpanded(e => !e)}>
-                    <div style={{ fontFamily: "Syne", fontWeight: 600 }}>🌊 Expense Flow by Category</div>
+                    <div style={{ fontFamily: "Syne", fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}><MIcon name="waterfall_chart" size={20} color={T.teal} /> Expense Flow by Category</div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <span style={{ fontSize: 11, color: T.muted }}>{sankeyExpanded ? "Click to collapse" : "Click to expand"}</span>
-                      <span style={{ fontSize: 16, color: T.teal, transition: "transform 0.3s", display: "inline-block", transform: sankeyExpanded ? "rotate(180deg)" : "rotate(0deg)" }}>⌃</span>
+                      <span style={{ fontSize: 16, color: T.teal, transition: "transform 0.3s", display: "inline-block", transform: sankeyExpanded ? "rotate(180deg)" : "rotate(0deg)" }}>><MIcon name="expand_less" size={16} /></span>
                     </div>
                   </div>
 
@@ -2655,7 +2686,7 @@ export default function BudgetApp() {
             ) : (
               /* Upload prompt on dashboard */
               <div className="card" style={{ textAlign: "center", padding: 60 }}>
-                <div style={{ fontSize: 48, marginBottom: 12 }}>📊</div>
+                <div style={{ marginBottom: 12 }}><MIcon name="bar_chart" size={48} style={{ color: T.teal }} /></div>
                 <div style={{ fontFamily: "Syne", fontSize: 18, fontWeight: 600, marginBottom: 8 }}>No transactions yet</div>
                 <div style={{ color: T.muted, marginBottom: 20, fontSize: 14 }}>Upload a bank statement to unlock your full dashboard</div>
                 <button className="btn btn-primary" onClick={() => setTab("transactions")}>
@@ -2689,7 +2720,7 @@ export default function BudgetApp() {
             <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
               {/* Search */}
               <div style={{ position: "relative", flex: "1 1 220px" }}>
-                <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: T.muted, fontSize: 14, pointerEvents: "none" }}>🔍</span>
+                <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: T.muted, fontSize: 14, pointerEvents: "none" }}><MIcon name="search" size={14} /></span>
                 <input className="input" placeholder="Search descriptions..."
                   value={txnSearch}
                   onChange={e => { setTxnSearch(e.target.value); setTxnPage(0); }}
@@ -2709,23 +2740,36 @@ export default function BudgetApp() {
 
               {/* Debit / Credit filter */}
               <div style={{ display: "flex", gap: 0, background: "rgba(255,255,255,0.04)", borderRadius: 10, padding: 3, flexShrink: 0 }}>
-                {[{ id: "all", label: "All" }, { id: "debit", label: "💸 Debits" }, { id: "credit", label: "💰 Credits" }].map(opt => (
+                {[{ id: "all", label: "All" }, { id: "debit", label: "Debits", icon: "trending_down" }, { id: "credit", label: "Credits", icon: "trending_up" }].map(opt => (
                   <button key={opt.id} onClick={() => { setTxnFilterType(opt.id); setTxnPage(0); }}
                     style={{ padding: "6px 12px", border: "none", borderRadius: 8, cursor: "pointer",
                       fontFamily: "DM Sans", fontSize: 12, fontWeight: 500, whiteSpace: "nowrap",
                       background: txnFilterType === opt.id ? T.teal : "transparent",
                       color: txnFilterType === opt.id ? T.bg : T.muted,
                       transition: "all 0.15s" }}>
-                    {opt.label}
+                    {opt.icon && <MIcon name={opt.icon} size={14} style={{ marginRight: 2 }} />}{opt.label}
                   </button>
                 ))}
               </div>
 
+              {/* Date range */}
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                <input type="date" className="input" style={{ padding: "7px 10px", fontSize: 12, width: 140 }}
+                  value={txnDateFrom}
+                  onChange={e => { setTxnDateFrom(e.target.value); setTxnPage(0); }}
+                  placeholder="From" title="From date" />
+                <span style={{ color: T.muted, fontSize: 12 }}>–</span>
+                <input type="date" className="input" style={{ padding: "7px 10px", fontSize: 12, width: 140 }}
+                  value={txnDateTo}
+                  onChange={e => { setTxnDateTo(e.target.value); setTxnPage(0); }}
+                  placeholder="To" title="To date" />
+              </div>
+
               {/* Clear filters */}
-              {(txnSearch || txnFilterCat !== "all" || txnFilterType !== "all") && (
+              {(txnSearch || txnFilterCat !== "all" || txnFilterType !== "all" || txnDateFrom || txnDateTo) && (
                 <button className="btn btn-ghost" style={{ fontSize: 12, padding: "6px 12px", flexShrink: 0 }}
-                  onClick={() => { setTxnSearch(""); setTxnFilterCat("all"); setTxnFilterType("all"); setTxnPage(0); }}>
-                  ✕ Clear filters
+                  onClick={() => { setTxnSearch(""); setTxnFilterCat("all"); setTxnFilterType("all"); setTxnDateFrom(""); setTxnDateTo(""); setTxnPage(0); }}>
+                  <MIcon name="close" size={13} style={{marginRight:3}} /> Clear filters
                 </button>
               )}
             </div>
@@ -2774,6 +2818,8 @@ export default function BudgetApp() {
                             if (txnFilterCat !== "all" && txnFilterCat !== "uncategorized" && t.categoryId !== txnFilterCat) return false;
                             if (txnFilterType === "debit" && t.amount >= 0) return false;
                             if (txnFilterType === "credit" && t.amount < 0) return false;
+                            if (txnDateFrom) { const d = parseDate(t.date); if (!d || d < new Date(txnDateFrom + "T00:00:00")) return false; }
+                            if (txnDateTo) { const d = parseDate(t.date); if (!d || d > new Date(txnDateTo + "T23:59:59")) return false; }
                             return true;
                           })
                           .sort((a, b) => {
@@ -2838,6 +2884,8 @@ export default function BudgetApp() {
                       if (txnFilterCat !== "all" && txnFilterCat !== "uncategorized" && t.categoryId !== txnFilterCat) return false;
                       if (txnFilterType === "debit" && t.amount >= 0) return false;
                       if (txnFilterType === "credit" && t.amount < 0) return false;
+                      if (txnDateFrom) { const d = parseDate(t.date); if (!d || d < new Date(txnDateFrom + "T00:00:00")) return false; }
+                      if (txnDateTo) { const d = parseDate(t.date); if (!d || d > new Date(txnDateTo + "T23:59:59")) return false; }
                       return true;
                     })
                     .sort((a, b) => {
@@ -2852,11 +2900,21 @@ export default function BudgetApp() {
                     }
                     return 0;
                   });
-                  const totalPages = Math.ceil(sorted.length / TXN_PAGE_SIZE);
+                  const totalPagesRaw = Math.ceil(sorted.length / TXN_PAGE_SIZE);
+                  const totalPages = Math.min(totalPagesRaw, MAX_TXN_PAGES);
+                  const hitLimit = totalPagesRaw > MAX_TXN_PAGES;
                   const start = txnPage * TXN_PAGE_SIZE + 1;
                   const end = Math.min((txnPage + 1) * TXN_PAGE_SIZE, sorted.length);
-                  if (totalPages <= 1) return null;
+                  if (totalPages <= 1 && !hitLimit) return null;
                   return (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                      {hitLimit && txnPage >= MAX_TXN_PAGES - 1 && (
+                        <div style={{ padding: "14px 16px", textAlign: "center", background: "rgba(167,139,250,0.08)",
+                          borderTop: `1px solid rgba(167,139,250,0.2)`, fontSize: 13, color: "#A78BFA" }}>
+                          <MIcon name="filter_list" size={15} style={{ marginRight: 6, verticalAlign: "middle" }} />
+                          Filter your data to see more transactions
+                        </div>
+                      )}
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: `1px solid ${T.border}` }}>
                       <span style={{ fontSize: 13, color: T.muted }}>Showing {start}–{end} of {sorted.length} transactions</span>
                       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -2878,6 +2936,7 @@ export default function BudgetApp() {
                         <button className="btn btn-ghost" style={{ padding: "4px 10px", fontSize: 13 }}
                           onClick={() => setTxnPage(totalPages - 1)} disabled={txnPage === totalPages - 1}>»</button>
                       </div>
+                    </div>
                     </div>
                   );
                 })()}
@@ -2950,7 +3009,7 @@ export default function BudgetApp() {
                         <div className="progress-bar">
                           <div className="progress-fill" style={{ width: `${pct}%`, background: over ? T.coral : cat.color }} />
                         </div>
-                        {over && <div style={{ fontSize: 11, color: T.coral, marginTop: 4 }}>⚠ Over budget by {fmt(spent - cat.budget)}</div>}
+                        {over && <div style={{ fontSize: 11, color: T.coral, marginTop: 4 }}><span style={{display:"flex",alignItems:"center",gap:4}}><MIcon name="warning" size={13} color={T.coral} /> Over budget by {fmt(spent - cat.budget)}</span></div>}
                       </>
                     )}
                     {txnCount > 0 && (
@@ -2966,13 +3025,13 @@ export default function BudgetApp() {
                 <>
                   {incomeCats.length > 0 && (
                     <>
-                      <div style={{ fontFamily: "Syne", fontWeight: 600, fontSize: 13, color: T.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 }}>💰 Income &amp; Savings</div>
+                      <div style={{ fontFamily: "Syne", fontWeight: 600, fontSize: 13, color: T.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 }}><MIcon name="savings" size={14} />&nbsp;Income &amp; Savings</div>
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(280px, 100%), 1fr))", gap: 14, marginBottom: 28 }}>
                         {incomeCats.map(renderCard)}
                       </div>
                     </>
                   )}
-                  <div style={{ fontFamily: "Syne", fontWeight: 600, fontSize: 13, color: T.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 }}>💸 Expenses</div>
+                  <div style={{ fontFamily: "Syne", fontWeight: 600, fontSize: 13, color: T.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 }}><MIcon name="trending_down" size={14} />&nbsp;Expenses</div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(280px, 100%), 1fr))", gap: 14 }}>
                     {expenseCats.map(renderCard)}
                   </div>
@@ -3126,7 +3185,7 @@ export default function BudgetApp() {
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
                           <span style={{ fontSize: 12, color: isComplete ? goal.color : T.muted }}>
-                            {isComplete ? "🎉 Goal reached!" : `${pct.toFixed(0)}% complete`}
+                            {isComplete ? "Goal reached!" : `${pct.toFixed(0)}% complete`}
                           </span>
                           {!isComplete && <span style={{ fontSize: 12, color: T.muted }}>{fmt(remaining)} to go</span>}
                         </div>
@@ -3157,7 +3216,7 @@ export default function BudgetApp() {
                 {/* Empty state */}
                 {savingsGoals.length === 0 && (
                   <div className="card" style={{ gridColumn: "1 / -1", textAlign: "center", padding: 60 }}>
-                    <div style={{ fontSize: 48, marginBottom: 12 }}>🐷</div>
+                    <div style={{ marginBottom: 12 }}><MIcon name="savings" size={48} style={{ color: T.teal }} /></div>
                     <div style={{ fontFamily: "Syne", fontSize: 18, fontWeight: 600, marginBottom: 8 }}>No savings goals yet</div>
                     <div style={{ color: T.muted, marginBottom: 20, fontSize: 14 }}>Set a goal and start tracking your progress!</div>
                     <button className="btn btn-primary" onClick={() => setModal({ type: "addSavingsGoal" })}>
@@ -3564,7 +3623,7 @@ export default function BudgetApp() {
               {/* Setup Genie */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderBottom: `1px solid ${T.border}` }}>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 500 }}>✨ Setup Genie</div>
+                  <div style={{ fontSize: 14, fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}><MIcon name="auto_awesome" size={16} color={T.teal} /> Setup Genie</div>
                   <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>Replay the app tour</div>
                 </div>
                 <button className="btn btn-ghost" style={{ fontSize: 13 }} onClick={() => setShowSetupGenie(true)}>
@@ -3580,7 +3639,7 @@ export default function BudgetApp() {
                       <div style={{ fontSize: 14, fontWeight: 500 }}>View Built-In Keywords</div>
                       <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>{DEFAULT_KEYWORDS.length} rules that auto-categorize common merchants</div>
                     </div>
-                    <span style={{ fontSize: 12, color: T.teal, flexShrink: 0, marginLeft: 12 }}>View ▾</span>
+                    <span style={{ fontSize: 12, color: T.teal, flexShrink: 0, marginLeft: 12 }}><MIcon name="expand_more" size={16} color={T.teal} /></span>
                   </summary>
                   <div style={{ marginTop: 14 }}>
                     {/* Group by category */}
@@ -3804,7 +3863,7 @@ const WIZARD_STEPS = [
   { id: "utilities", title: "Utilities & Bills",            subtitle: "What do you typically pay each month?" },
   { id: "food",      title: "Food & Groceries",             subtitle: "Set your monthly food budgets." },
   { id: "income",    title: "Income Keyword",               subtitle: "What word appears in your paycheck on your bank statement?" },
-  { id: "done",      title: "You're all set! 🎉",           subtitle: "Your budgets have been saved." },
+  { id: "done",      title: "You're all set!",           subtitle: "Your budgets have been saved." },
 ];
 
 function SetupWizard({ categories, setCategories, setCustomKeywords, onComplete }) {
@@ -3914,7 +3973,7 @@ function SetupWizard({ categories, setCategories, setCustomKeywords, onComplete 
       <div style={{ display: "flex", flexDirection: "column", gap: 14, minHeight: 160 }}>
         {step === 0 && (
           <div style={{ textAlign: "center", padding: "20px 0" }}>
-            <div style={{ fontSize: 64, marginBottom: 16 }}>💰</div>
+            <div style={{ marginBottom: 16 }}><MIcon name="savings" size={64} style={{ color: T.teal }} /></div>
             <div style={{ color: T.muted, fontSize: 14, lineHeight: 1.7 }}>
               We'll walk you through setting your monthly budgets<br/>for the most common expense categories.<br/><br/>
               <span style={{ color: T.teal }}>You can always change these later</span> in the Categories tab.
@@ -3964,10 +4023,10 @@ function SetupWizard({ categories, setCategories, setCustomKeywords, onComplete 
         )}
         {step === WIZARD_STEPS.length - 1 && (
           <div style={{ textAlign: "center", padding: "20px 0" }}>
-            <div style={{ fontSize: 64, marginBottom: 16 }}>🎯</div>
+            <div style={{ marginBottom: 16 }}><MIcon name="track_changes" size={64} style={{ color: T.teal }} /></div>
             <div style={{ color: T.muted, fontSize: 14, lineHeight: 1.7 }}>
               Your budgets are saved. Upload a bank statement in the<br/><strong style={{ color: T.text }}>Transactions</strong> tab to see everything in action.<br/><br/>
-              You can re-run this wizard anytime via<br/><span style={{ color: T.teal }}>⚙️ Budget Setup</span> in the sidebar.
+              You can re-run this wizard anytime via<br/><span style={{ color: T.teal }}>Budget Setup</span> in the sidebar.
             </div>
           </div>
         )}
@@ -3985,7 +4044,7 @@ function SetupWizard({ categories, setCategories, setCustomKeywords, onComplete 
             <button className="btn btn-ghost" onClick={onComplete}>Skip setup</button>
           )}
           <button className="btn btn-primary" onClick={next}>
-            {step === WIZARD_STEPS.length - 2 ? "Save & Finish →" : step === WIZARD_STEPS.length - 1 ? "Get Started! 🚀" : "Next →"}
+            {step === WIZARD_STEPS.length - 2 ? "Save & Finish →" : step === WIZARD_STEPS.length - 1 ? "Get Started!" : "Next →"}
           </button>
         </div>
       </div>
@@ -4076,7 +4135,7 @@ function ColumnMapper({ modal, categories, customKeywords, setTransactions, noti
       <div>
         <div style={{ fontSize: 12, color: T.muted, marginBottom: 6 }}>Your bank <span style={{ color: T.muted, fontWeight: 400 }}>(optional — auto-fills columns)</span></div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {[{ key: "", label: "Other / Unknown" }, ...Object.entries(BANK_PRESETS).map(([k, v]) => ({ key: k, label: `${v.logo} ${v.name}` }))].map(b => (
+          {[{ key: "", label: "Other / Unknown" }, ...Object.entries(BANK_PRESETS).map(([k, v]) => ({ key: k, label: v.name, icon: v.logo }))].map(b => (
             <button key={b.key} onClick={() => applyBank(b.key)}
               style={{ padding: "6px 12px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "DM Sans",
                 background: selectedBank === b.key ? T.teal : "rgba(255,255,255,0.05)",
@@ -4095,11 +4154,11 @@ function ColumnMapper({ modal, categories, customKeywords, setTransactions, noti
 
       {/* Column selectors */}
       {[
-        { label: "📅 Date column", field: "date", required: true },
+        { label: "Date column", field: "date", required: true },
         { label: "🏪 Description / Merchant column", field: "desc", required: true },
-        { label: "💵 Amount column (single +/- column)", field: "amount", required: false },
-        { label: "📤 Debit / Withdrawal column", field: "debit", required: false },
-        { label: "📥 Credit / Deposit column", field: "credit", required: false },
+        { label: "Amount column (single +/- column)", field: "amount", required: false },
+        { label: "Debit / Withdrawal column", field: "debit", required: false },
+        { label: "Credit / Deposit column", field: "credit", required: false },
       ].map(({ label, field, required }) => (
         <div key={field}>
           <div style={{ fontSize: 12, color: T.muted, marginBottom: 4 }}>{label}{required && <span style={{ color: T.coral }}> *</span>}</div>
@@ -4242,7 +4301,7 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
                     }}>
                     <option value="">— Choose a category —</option>
                     {available.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    <option value="custom">✏️ Custom (enter your own)</option>
+                    <option value="custom">Custom (enter your own)</option>
                   </select>
                 </div>
 
@@ -4325,8 +4384,8 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
             <input className="input" placeholder="Note (optional)" onChange={e => set("note", e.target.value)} />
             {(modal.accountType === "business" || modal.accountType === "both" || true) && (
               <select className="input" onChange={e => set("account", e.target.value)}>
-                <option value="personal">🏠 Personal</option>
-                <option value="business">💼 Business</option>
+                <option value="personal">Personal</option>
+                <option value="business">Business</option>
               </select>
             )}
           </>}
@@ -4341,13 +4400,13 @@ function Modal({ modal, setModal, categories, setCategories, bills, setBills, sc
               {sortedCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             <div style={{ fontSize: 12, color: T.muted }}>
-              💡 Tip: Keywords are not case-sensitive. "starbucks" matches "STARBUCKS", "Starbucks", etc.
+              Tip: Keywords are not case-sensitive. "starbucks" matches "STARBUCKS", "Starbucks", etc.
             </div>
           </>}
 
           {modal.type === "columnMapper" && <ColumnMapper modal={modal} categories={categories} customKeywords={customKeywords} setTransactions={setTransactions} notify={notify} close={close} guessCategory={guessCategory} />}
           {modal.type === "categoryDrilldown" && <CategoryDrilldown modal={modal} categories={categories} transactions={transactions} setTransactions={setTransactions} dbStatus={dbStatus} notify={notify} close={close} />}
-{modal.type === "setupWizard" && <SetupWizard categories={categories} setCategories={setCategories} setCustomKeywords={setCustomKeywords} onComplete={() => { localStorage.setItem("smartbudget_setup_done","1"); setSetupComplete(true); close(); notify("Setup complete! 🎉"); }} />}
+{modal.type === "setupWizard" && <SetupWizard categories={categories} setCategories={setCategories} setCustomKeywords={setCustomKeywords} onComplete={() => { localStorage.setItem("smartbudget_setup_done","1"); setSetupComplete(true); close(); notify("Setup complete!"); }} />}
 
           {(modal.type === "addSavingsGoal" || modal.type === "editSavingsGoal") && <>
             <input className="input" placeholder="Goal name (e.g. Emergency Fund)" defaultValue={modal.goal?.name || ""}
