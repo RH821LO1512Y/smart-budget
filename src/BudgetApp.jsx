@@ -1927,6 +1927,8 @@ export default function BudgetApp() {
   const [sortDir, setSortDir] = useState("desc");
   const [txnPage, setTxnPage] = useState(0);
   const TXN_PAGE_SIZE = 100;
+  const [selectedTxns, setSelectedTxns] = useState(new Set());
+const [bulkMode, setBulkMode] = useState(false);
   const [txnSearch, setTxnSearch] = useState("");
   const [duplicateReview, setDuplicateReview] = useState(null); // { incoming, duplicates, unique }
   const [txnFilterCat, setTxnFilterCat] = useState("all");
@@ -1934,6 +1936,7 @@ export default function BudgetApp() {
   const [txnDateFrom, setTxnDateFrom] = useState("");
   const [txnDateTo, setTxnDateTo] = useState("");
   const MAX_TXN_PAGES = 6;
+  const [trendCatFilter, setTrendCatFilter] = useState("all");
   const [sankeyExpanded, setSankeyExpanded] = useState(false);
   const [compareMonths, setCompareMonths] = useState([]); // up to 3 "YYYY-MM" strings
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
@@ -2579,6 +2582,65 @@ export default function BudgetApp() {
                     </ResponsiveContainer>
                   ) : <div style={{ color: T.muted, fontSize: 13, textAlign: "center", padding: 40 }}>Upload transactions to see monthly trends</div>}
                 </div>
+                {/* ── Expense Trend by Category ── */}
+<div className="card" style={{ gridColumn: "1 / -1" }}>
+  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+    <div style={{ fontFamily: "Syne", fontWeight: 600 }}>Expense Trend</div>
+    <select className="input" style={{ width: "auto", fontSize: 12, padding: "5px 12px" }}
+      value={trendCatFilter}
+      onChange={e => setTrendCatFilter(e.target.value)}>
+      <option value="all">All Expenses</option>
+      {sortedCategories.filter(c => c.type === "expense").map(c => (
+        <option key={c.id} value={c.id}>{c.name}</option>
+      ))}
+    </select>
+  </div>
+  {(() => {
+    // Build monthly totals for selected category
+    const monthMap = {};
+    transactions.forEach(t => {
+      const d = parseDate(t.date);
+      if (!d || t.amount >= 0) return; // expenses only
+      if (trendCatFilter !== "all" && t.categoryId !== trendCatFilter) return;
+      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+      monthMap[key] = (monthMap[key] || 0) + Math.abs(t.amount);
+    });
+    const data = Object.entries(monthMap)
+      .sort(([a],[b]) => a.localeCompare(b))
+      .slice(-12) // last 12 months
+      .map(([ym, total]) => {
+        const [y, m] = ym.split("-");
+        return { label: `${MONTHS[parseInt(m)-1]} '${y.slice(2)}`, total };
+      });
+    if (data.length === 0) return (
+      <div style={{ color: T.muted, fontSize: 13, textAlign: "center", padding: 40 }}>
+        No expense data for the selected category
+      </div>
+    );
+    const color = trendCatFilter === "all" ? T.coral
+      : (sortedCategories.find(c => c.id === trendCatFilter)?.color || T.coral);
+    return (
+      <ResponsiveContainer width="100%" height={220}>
+        <AreaChart data={data}>
+          <defs>
+            <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={color} stopOpacity={0.3} />
+              <stop offset="95%" stopColor={color} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+          <XAxis dataKey="label" tick={{ fontSize: 11, fill: T.muted }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fontSize: 11, fill: T.muted }} axisLine={false} tickLine={false}
+            tickFormatter={v => `$${(v/1000).toFixed(1)}k`} />
+          <Tooltip formatter={v => [fmt(v), trendCatFilter === "all" ? "Total Expenses" : sortedCategories.find(c => c.id === trendCatFilter)?.name]}
+            contentStyle={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 13 }} />
+          <Area type="monotone" dataKey="total" stroke={color} strokeWidth={2}
+            fill="url(#trendGrad)" dot={{ fill: color, r: 3 }} activeDot={{ r: 5 }} />
+        </AreaChart>
+      </ResponsiveContainer>
+    );
+  })()}
+</div>
 
                 {/* Sankey — full width, expandable */}
                 <div className="card" style={{ gridColumn: "1 / -1", transition: "all 0.3s ease" }}>
@@ -2709,13 +2771,61 @@ export default function BudgetApp() {
                 <button className="btn btn-primary" onClick={() => fileRef.current?.click()}>
                   <Upload size={15} /> Upload File
                 </button>
+                <button className="btn btn-ghost" onClick={() => { setBulkMode(b => !b); setSelectedTxns(new Set()); }}>
+  <MIcon name={bulkMode ? "close" : "checklist"} size={15} /> {bulkMode ? "Exit" : "Select"}
+</button>
                 <button className="btn btn-ghost" onClick={() => setModal({ type: "addTransaction" })}>
                   <Plus size={15} /> Add Manual
                 </button>
               </div>
               <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls,.pdf" style={{ display: "none" }} onChange={e => handleFiles(e.target.files)} />
             </div>
-
+{/* ── Bulk Action Toolbar ── */}
+{bulkMode && (
+  <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px",
+    background: "rgba(167,139,250,0.1)", border: `1px solid rgba(167,139,250,0.3)`,
+    borderRadius: 12, marginBottom: 12, flexWrap: "wrap" }}>
+    <span style={{ fontSize: 13, color: "#A78BFA", fontWeight: 600 }}>
+      {selectedTxns.size} selected
+    </span>
+    <button className="btn btn-ghost" style={{ fontSize: 12 }}
+      onClick={() => setSelectedTxns(new Set(transactions.map(t => t.id)))}>
+      Select all ({transactions.length})
+    </button>
+    <button className="btn btn-ghost" style={{ fontSize: 12 }}
+      onClick={() => setSelectedTxns(new Set())}>
+      Clear selection
+    </button>
+    <div style={{ height: 20, width: 1, background: "rgba(255,255,255,0.1)" }} />
+    <select className="input" style={{ fontSize: 12, padding: "5px 10px", width: "auto" }}
+      defaultValue=""
+      onChange={e => {
+        if (!e.target.value) return;
+        setTransactions(prev => prev.map(t =>
+          selectedTxns.has(t.id) ? { ...t, categoryId: e.target.value } : t
+        ));
+        setSelectedTxns(new Set());
+        notify(`Relabeled ${selectedTxns.size} transactions`);
+        e.target.value = "";
+      }}>
+      <option value="">— Relabel selected as… —</option>
+      {sortedCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+    </select>
+    <button className="btn btn-danger" style={{ fontSize: 12 }}
+      onClick={() => {
+        const count = selectedTxns.size;
+        setTransactions(prev => prev.filter(t => !selectedTxns.has(t.id)));
+        setSelectedTxns(new Set());
+        notify(`Deleted ${count} transactions`);
+      }}>
+      <MIcon name="delete" size={14} /> Delete selected
+    </button>
+    <button className="btn btn-ghost" style={{ fontSize: 12, marginLeft: "auto" }}
+      onClick={() => { setBulkMode(false); setSelectedTxns(new Set()); }}>
+      Done
+    </button>
+  </div>
+)}
             {/* ── Search + Filter bar ── */}
             <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
               {/* Search */}
@@ -2790,24 +2900,32 @@ export default function BudgetApp() {
                 <div style={{ overflowX: "auto" }}>
                   <table>
                     <thead>
-                      <tr>
-                        {[
-                          { key: "date", label: "Date" },
-                          { key: "description", label: "Description" },
-                          { key: "category", label: "Category" },
-                          { key: "amount", label: "Amount", right: true },
-                        ].map(col => (
-                          <th key={col.key} style={{ textAlign: col.right ? "right" : "left", cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }}
-                            onClick={() => { setTxnPage(0); if (sortCol === col.key) setSortDir(d => d === "asc" ? "desc" : "asc"); else { setSortCol(col.key); setSortDir(col.key === "amount" ? "desc" : "asc"); } }}>
-                            {col.label}
-                            <span style={{ marginLeft: 4, opacity: sortCol === col.key ? 1 : 0.3, fontSize: 10 }}>
-                              {sortCol === col.key ? (sortDir === "asc" ? "▲" : "▼") : "▲▼"}
-                            </span>
-                          </th>
-                        ))}
-                        <th></th>
-                      </tr>
-                    </thead>
+  <tr>
+    {bulkMode && (
+      <th style={{ width: 36, padding: "8px 8px" }}>
+        <input type="checkbox"
+          checked={selectedTxns.size > 0 && [...transactions].every(t => selectedTxns.has(t.id))}
+          onChange={e => setSelectedTxns(e.target.checked ? new Set(transactions.map(t => t.id)) : new Set())}
+          style={{ cursor: "pointer", width: 15, height: 15 }} />
+      </th>
+    )}
+    {[
+      { key: "date", label: "Date" },
+      { key: "description", label: "Description" },
+      { key: "category", label: "Category" },
+      { key: "amount", label: "Amount", right: true },
+    ].map(col => (
+      <th key={col.key} style={{ textAlign: col.right ? "right" : "left", cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }}
+        onClick={() => { setTxnPage(0); if (sortCol === col.key) setSortDir(d => d === "asc" ? "desc" : "asc"); else { setSortCol(col.key); setSortDir(col.key === "amount" ? "desc" : "asc"); } }}>
+        {col.label}
+        <span style={{ marginLeft: 4, opacity: sortCol === col.key ? 1 : 0.3, fontSize: 10 }}>
+          {sortCol === col.key ? (sortDir === "asc" ? "▲" : "▼") : "▲▼"}
+        </span>
+      </th>
+    ))}
+    <th></th>
+  </tr>
+</thead>
                     <tbody>
                       {(() => {
                         const q = txnSearch.toLowerCase().trim();
@@ -2839,6 +2957,18 @@ export default function BudgetApp() {
                         const cat = categories.find(c => c.id === t.categoryId);
                         return (
                           <tr key={t.id}>
+                            {bulkMode && (
+  <td style={{ padding: "10px 8px" }} onClick={e => e.stopPropagation()}>
+    <input type="checkbox"
+      checked={selectedTxns.has(t.id)}
+      onChange={() => setSelectedTxns(prev => {
+        const next = new Set(prev);
+        next.has(t.id) ? next.delete(t.id) : next.add(t.id);
+        return next;
+      })}
+      style={{ cursor: "pointer", width: 15, height: 15 }} />
+  </td>
+)}
                             <td style={{ color: T.muted, fontSize: 12, whiteSpace: "nowrap" }}>{t.date}</td>
                             <td style={{ maxWidth: 260 }}>
                               <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
