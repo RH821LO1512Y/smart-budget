@@ -4,9 +4,18 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, ReferenceLine,
   LineChart, Line, Area, AreaChart
 } from "recharts";
+import GridLayout from 'react-grid-layout';
 import { Upload, DollarSign, TrendingUp, TrendingDown, CreditCard, Calendar, Tag, CheckCircle, Circle, Plus, Trash2, X, ChevronLeft, ChevronRight, ArrowRight, AlertCircle, PiggyBank, Target, Edit2, Layers, LogOut, UserCircle } from "lucide-react";
 
 // ─── Google Fonts ─────────────────────────────────────────────────────────────
+const rlLink = document.createElement("link");
+rlLink.rel = "stylesheet";
+rlLink.href = "https://unpkg.com/react-grid-layout@1.4.4/css/styles.css";
+document.head.appendChild(rlLink);
+const rlLink2 = document.createElement("link");
+rlLink2.rel = "stylesheet";
+rlLink2.href = "https://unpkg.com/react-resizable@3.0.5/css/styles.css";
+document.head.appendChild(rlLink2);
 const fontLink = document.createElement("link");
 fontLink.rel = "stylesheet";
 fontLink.href = "https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap";
@@ -1936,6 +1945,13 @@ const [bulkMode, setBulkMode] = useState(false);
   const [txnDateFrom, setTxnDateFrom] = useState("");
   const [txnDateTo, setTxnDateTo] = useState("");
   const MAX_TXN_PAGES = 6;
+  const [dashLayout, setDashLayout] = useState([
+  { i: "pie",     x: 0, y: 0,  w: 6,  h: 8  },
+  { i: "savings", x: 6, y: 0,  w: 6,  h: 8  },
+  { i: "bar",     x: 0, y: 8,  w: 12, h: 9  },
+  { i: "sankey",  x: 0, y: 17, w: 12, h: 11 },
+  { i: "trend",   x: 0, y: 28, w: 12, h: 9  },
+]);
   const [trendCatFilter, setTrendCatFilter] = useState("all");
   const [sankeyExpanded, setSankeyExpanded] = useState(false);
   const [compareMonths, setCompareMonths] = useState([]); // up to 3 "YYYY-MM" strings
@@ -2492,9 +2508,17 @@ const [bulkMode, setBulkMode] = useState(false);
 
             {/* Charts */}
             {transactions.length > 0 ? (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))", gap: 16 }}>
-
+<GridLayout
+  className="layout"
+  layout={dashLayout}
+  cols={12}
+  rowHeight={40}
+  width={1200}
+  onLayoutChange={l => setDashLayout(l)}
+  draggableHandle=".drag-handle"
+  style={{ minHeight: 400 }}>
                 {/* Pie — clickable → categories */}
+              <div key="pie"><div className="drag-handle" style={{cursor:"grab",padding:"4px 12px",marginBottom:8,background:"rgba(255,255,255,0.04)",borderRadius:8,fontSize:11,color:T.muted}}>⠿ Spending by Category</div>
                 <div className="card" onClick={() => setTab("categories")}
                   style={{ cursor: "pointer", transition: "border-color 0.2s, transform 0.15s", borderColor: T.border }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = T.teal; e.currentTarget.style.transform = "translateY(-2px)"; }}
@@ -2527,9 +2551,11 @@ const [bulkMode, setBulkMode] = useState(false);
                     ))}
                   </div>
                 </div>
+              </div>
 
                 {/* Savings Trend — clickable → savings */}
-                <div className="card" onClick={() => setTab("savings")}
+                <div key="savings"><div className="drag-handle" style={{cursor:"grab",padding:"4px 12px",marginBottom:8,background:"rgba(255,255,255,0.04)",borderRadius:8,fontSize:11,color:T.muted}}>⠿ Spending by Category</div>
+                  <div className="card" onClick={() => setTab("savings")}
                   style={{ cursor: "pointer", transition: "border-color 0.2s, transform 0.15s", borderColor: T.border }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = T.teal; e.currentTarget.style.transform = "translateY(-2px)"; }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.transform = "translateY(0)"; }}>
@@ -2555,9 +2581,10 @@ const [bulkMode, setBulkMode] = useState(false);
                     </ResponsiveContainer>
                   ) : <div style={{ color: T.muted, fontSize: 13, textAlign: "center", padding: 40 }}>Savings data will appear here</div>}
                 </div>
+                  </div>
 
                 {/* Income vs Expenses — full width, clickable → transactions */}
-                <div className="card" style={{ gridColumn: "1 / -1", cursor: "pointer", transition: "border-color 0.2s", borderColor: T.border }}
+                <div key="bar"><div className="drag-handle" style={{cursor:"grab",padding:"4px 12px",marginBottom:8,background:"rgba(255,255,255,0.04)",borderRadius:8,fontSize:11,color:T.muted}}>⠿ Spending by Category</div><div className="card" style={{ gridColumn: "1 / -1", cursor: "pointer", transition: "border-color 0.2s", borderColor: T.border }}
                   onClick={() => setTab("transactions")}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = T.teal; }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; }}>
@@ -2581,6 +2608,7 @@ const [bulkMode, setBulkMode] = useState(false);
                       </BarChart>
                     </ResponsiveContainer>
                   ) : <div style={{ color: T.muted, fontSize: 13, textAlign: "center", padding: 40 }}>Upload transactions to see monthly trends</div>}
+                </div>
                 </div>
                 {/* ── Expense Trend by Category ── */}
 <div className="card" style={{ gridColumn: "1 / -1" }}>
@@ -2744,7 +2772,7 @@ const [bulkMode, setBulkMode] = useState(false);
                   })()}
                 </div>
 
-              </div>
+              </GridLayout>
             ) : (
               /* Upload prompt on dashboard */
               <div className="card" style={{ textAlign: "center", padding: 60 }}>
